@@ -58,6 +58,10 @@ struct ParamWalkerContext
 static bool contain_param_walker(Node *node, void *context);
 
 
+/* GUC that enables forced function call delegation */
+bool ForceFunctionCallDelegation = false;
+
+
 /*
  * contain_param_walker scans node for Param nodes.
  * Ignore the return value, instead check context afterwards.
@@ -219,7 +223,7 @@ TryToDelegateFunctionCall(DistributedPlanningContext *planContext)
 		return NULL;
 	}
 
-	if (IsMultiStatementTransaction())
+	if (IsMultiStatementTransaction() && !ForceFunctionCallDelegation)
 	{
 		/* cannot delegate function calls in a multi-statement transaction */
 		ereport(DEBUG1, (errmsg("not pushing down function calls in "

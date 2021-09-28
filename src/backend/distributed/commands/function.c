@@ -1931,7 +1931,7 @@ ErrorIfFunctionDependsOnExtension(const ObjectAddress *functionAddress)
 	/* captures the extension address during lookup */
 	ObjectAddress extensionAddress = { 0 };
 
-	if (IsObjectAddressOwnedByExtension(functionAddress, &extensionAddress))
+	if (IsObjectAddressOwnedByExtension(functionAddress, &extensionAddress) && false)
 	{
 		char *functionName =
 			getObjectIdentity_compat(functionAddress, /* missingOk: */ false);

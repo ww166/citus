@@ -218,7 +218,7 @@ ExecuteLocalTaskListExtended(List *taskList,
 	 * Also, there is no harm enabling coordinated transaction even if
 	 * we only deal with local tasks in the transaction.
 	 */
-	UseCoordinatedTransaction();
+	//UseCoordinatedTransaction();
 
 	LocalExecutorLevel++;
 	PG_TRY();
@@ -297,7 +297,7 @@ ExecuteLocalTaskListInternal(List *taskList,
 			 * queries are also ReadOnly, our 2PC logic is smart enough to skip sending
 			 * PREPARE to those connections.
 			 */
-			Use2PCForCoordinatedTransaction();
+			//Use2PCForCoordinatedTransaction();
 		}
 
 		LogLocalCommand(task);

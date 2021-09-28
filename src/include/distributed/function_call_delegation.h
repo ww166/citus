@@ -15,6 +15,10 @@
 #include "distributed/multi_physical_planner.h"
 
 
+/* GUC that enables forced function call delegation */
+extern bool ForceFunctionCallDelegation;
+
+
 PlannedStmt * TryToDelegateFunctionCall(DistributedPlanningContext *planContext);
 
 

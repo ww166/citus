@@ -35,6 +35,7 @@
 #include "distributed/connection_management.h"
 #include "distributed/cte_inline.h"
 #include "distributed/distributed_deadlock_detection.h"
+#include "distributed/function_call_delegation.h"
 #include "distributed/insert_select_executor.h"
 #include "distributed/intermediate_result_pruning.h"
 #include "distributed/local_multi_copy.h"
@@ -1063,6 +1064,16 @@ RegisterCitusConfigVariables(void)
 					 "for backwards compatibility with pre-8.2 behaviour."),
 		&FunctionOpensTransactionBlock,
 		true,
+		PGC_USERSET,
+		GUC_NO_SHOW_ALL,
+		NULL, NULL, NULL);
+
+	DefineCustomBoolVariable(
+		"citus.force_function_call_delegation",
+		gettext_noop("Force function call delegation in transaction blocks"),
+		NULL,
+		&ForceFunctionCallDelegation,
+		false,
 		PGC_USERSET,
 		GUC_NO_SHOW_ALL,
 		NULL, NULL, NULL);
