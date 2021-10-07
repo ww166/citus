@@ -1062,14 +1062,20 @@ EXPLAIN (COSTS FALSE)
 	AND l_suppkey = s_suppkey;
 Aggregate
   ->  Custom Scan (Citus Adaptive)
-        Task Count: 1
+        Task Count: 4
         Tasks Shown: None, not supported for re-partition queries
         ->  MapMergeJob
-              Map Task Count: 1
-              Merge Task Count: 1
+              Map Task Count: 4
+              Merge Task Count: 4
               ->  MapMergeJob
                     Map Task Count: 2
-                    Merge Task Count: 1
+                    Merge Task Count: 4
+              ->  MapMergeJob
+                    Map Task Count: 1
+                    Merge Task Count: 4
+        ->  MapMergeJob
+              Map Task Count: 1
+              Merge Task Count: 4
 EXPLAIN (COSTS FALSE, FORMAT JSON)
 	SELECT count(*)
 	FROM lineitem, orders, customer_append, supplier_single_shard
@@ -1090,18 +1096,26 @@ EXPLAIN (COSTS FALSE, FORMAT JSON)
           "Parallel Aware": false,
           "Distributed Query": {
             "Job": {
-              "Task Count": 1,
+              "Task Count": 4,
               "Tasks Shown": "None, not supported for re-partition queries",
               "Dependent Jobs": [
                 {
-                  "Map Task Count": 1,
-                  "Merge Task Count": 1,
+                  "Map Task Count": 4,
+                  "Merge Task Count": 4,
                   "Dependent Jobs": [
                     {
                       "Map Task Count": 2,
-                      "Merge Task Count": 1
+                      "Merge Task Count": 4
+                    },
+                    {
+                      "Map Task Count": 1,
+                      "Merge Task Count": 4
                     }
                   ]
+                },
+                {
+                  "Map Task Count": 1,
+                  "Merge Task Count": 4
                 }
               ]
             }
@@ -1138,18 +1152,26 @@ EXPLAIN (COSTS FALSE, FORMAT XML)
           <Parallel-Aware>false</Parallel-Aware>
           <Distributed-Query>
             <Job>
-              <Task-Count>1</Task-Count>
+              <Task-Count>4</Task-Count>
               <Tasks-Shown>None, not supported for re-partition queries</Tasks-Shown>
               <Dependent-Jobs>
                 <MapMergeJob>
-                  <Map-Task-Count>1</Map-Task-Count>
-                  <Merge-Task-Count>1</Merge-Task-Count>
+                  <Map-Task-Count>4</Map-Task-Count>
+                  <Merge-Task-Count>4</Merge-Task-Count>
                   <Dependent-Jobs>
                     <MapMergeJob>
                       <Map-Task-Count>2</Map-Task-Count>
-                      <Merge-Task-Count>1</Merge-Task-Count>
+                      <Merge-Task-Count>4</Merge-Task-Count>
+                    </MapMergeJob>
+                    <MapMergeJob>
+                      <Map-Task-Count>1</Map-Task-Count>
+                      <Merge-Task-Count>4</Merge-Task-Count>
                     </MapMergeJob>
                   </Dependent-Jobs>
+                </MapMergeJob>
+                <MapMergeJob>
+                  <Map-Task-Count>1</Map-Task-Count>
+                  <Merge-Task-Count>4</Merge-Task-Count>
                 </MapMergeJob>
               </Dependent-Jobs>
             </Job>
@@ -1196,11 +1218,13 @@ EXPLAIN (COSTS FALSE, FORMAT YAML)
         Parallel Aware: false
         Distributed Query:
           Job:
-            Task Count: 1
+            Task Count: 4
             Tasks Shown: "None, not supported for re-partition queries"
             Dependent Jobs:
               - Map Task Count: 2
-                Merge Task Count: 1
+                Merge Task Count: 4
+              - Map Task Count: 1
+                Merge Task Count: 4
 -- ensure local plans display correctly
 CREATE TABLE lineitem_clone (LIKE lineitem);
 EXPLAIN (COSTS FALSE) SELECT avg(l_linenumber) FROM lineitem_clone;
