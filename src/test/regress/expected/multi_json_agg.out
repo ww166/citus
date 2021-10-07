@@ -3,6 +3,7 @@
 --
 SET citus.next_shard_id TO 520000;
 SET citus.coordinator_aggregation_strategy TO 'disabled';
+SELECT run_command_on_master_and_workers($r$
 CREATE OR REPLACE FUNCTION array_sort (json)
 RETURNS json LANGUAGE SQL
 AS $$
@@ -10,6 +11,12 @@ SELECT json_agg(value) FROM (
 	SELECT value FROM json_array_elements($1) ORDER BY value::jsonb
 ) t
 $$;
+$r$);
+ run_command_on_master_and_workers
+---------------------------------------------------------------------
+
+(1 row)
+
 -- Check multi_cat_agg() aggregate which is used to implement json_agg()
 SELECT json_cat_agg(i) FROM
 	(VALUES ('[1,{"a":2}]'::json), ('[null]'::json), (NULL), ('["3",5,4]'::json)) AS t(i);
@@ -139,7 +146,7 @@ SELECT json_agg(case when l_quantity > 20 then l_quantity else NULL end)
 	FROM lineitem WHERE l_orderkey < 5;
                                             json_agg
 ---------------------------------------------------------------------
- [null, 36.00, null, 28.00, 24.00, 32.00, 38.00, 45.00, 49.00, 27.00, null, 28.00, 26.00, 30.00]
+ [null, 36.00, null, 28.00, 24.00, 32.00, 45.00, 49.00, 27.00, null, 28.00, 26.00, 30.00, 38.00]
 (1 row)
 
 -- Check that we can execute json_agg() with an expression containing different types
@@ -147,7 +154,7 @@ SELECT json_agg(case when l_quantity > 20 then to_json(l_quantity) else '"f"'::j
 	FROM lineitem WHERE l_orderkey < 5;
                                            json_agg
 ---------------------------------------------------------------------
- ["f", 36.00, "f", 28.00, 24.00, 32.00, 38.00, 45.00, 49.00, 27.00, "f", 28.00, 26.00, 30.00]
+ ["f", 36.00, "f", 28.00, 24.00, 32.00, 45.00, 49.00, 27.00, "f", 28.00, 26.00, 30.00, 38.00]
 (1 row)
 
 -- Check that we can execute json_agg() with an expression containing json arrays
@@ -155,21 +162,15 @@ SELECT json_agg(json_build_array(l_quantity, l_shipdate))
 	FROM lineitem WHERE l_orderkey < 3;
                                                                              json_agg
 ---------------------------------------------------------------------
- [[17.00, "1996-03-13"], [36.00, "1996-04-12"], [8.00, "1996-01-29"], [28.00, "1996-04-21"], [24.00, "1996-03-30"], [32.00, "1996-01-30"], [38.00, "1997-01-28"]]
+ [[38.00, "1997-01-28"], [17.00, "1996-03-13"], [36.00, "1996-04-12"], [8.00, "1996-01-29"], [28.00, "1996-04-21"], [24.00, "1996-03-30"], [32.00, "1996-01-30"]]
 (1 row)
 
 -- Check that we can execute json_agg() with an expression containing arrays
 SELECT json_agg(ARRAY[l_quantity, l_orderkey])
 	FROM lineitem WHERE l_orderkey < 3;
-   json_agg
+                                   json_agg
 ---------------------------------------------------------------------
- [[17.00,1], +
-  [36.00,1], +
-  [8.00,1],  +
-  [28.00,1], +
-  [24.00,1], +
-  [32.00,1], +
-  [38.00,2]]
+ [[17.00,1], [36.00,1], [8.00,1], [28.00,1], [24.00,1], [32.00,1], [38.00,2]]
 (1 row)
 
 -- Check that we return NULL in case there are no input rows to json_agg()

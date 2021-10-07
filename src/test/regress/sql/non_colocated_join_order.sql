@@ -3,6 +3,7 @@
 --
 
 -- Tests to check placements of shards must be equal to choose local join logic.
+SET citus.enable_repartition_joins TO on;
 
 CREATE TABLE test_table_1(id int, value_1 int);
 SELECT master_create_distributed_table('test_table_1', 'id', 'append');

@@ -6,6 +6,7 @@
 SET citus.next_shard_id TO 520000;
 SET citus.coordinator_aggregation_strategy TO 'disabled';
 
+SELECT run_command_on_master_and_workers($r$
 CREATE OR REPLACE FUNCTION array_sort (json)
 RETURNS json LANGUAGE SQL
 AS $$
@@ -13,6 +14,7 @@ SELECT json_agg(value) FROM (
 	SELECT value FROM json_array_elements($1) ORDER BY value::jsonb
 ) t
 $$;
+$r$);
 
 -- Check multi_cat_agg() aggregate which is used to implement json_agg()
 

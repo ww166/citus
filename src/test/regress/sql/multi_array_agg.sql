@@ -6,11 +6,13 @@
 SET citus.next_shard_id TO 520000;
 SET citus.coordinator_aggregation_strategy TO 'disabled';
 
+SELECT run_command_on_master_and_workers($r$
 CREATE OR REPLACE FUNCTION array_sort (ANYARRAY)
 RETURNS ANYARRAY LANGUAGE SQL
 AS $$
 SELECT ARRAY(SELECT unnest($1) ORDER BY 1)
 $$;
+$r$);
 
 -- Check multi_cat_agg() aggregate which is used to implement array_agg()
 

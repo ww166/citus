@@ -6,11 +6,13 @@
 SET citus.next_shard_id TO 520000;
 SET citus.coordinator_aggregation_strategy TO 'disabled';
 
+SELECT run_command_on_master_and_workers($r$
 CREATE OR REPLACE FUNCTION count_keys (jsonb)
 RETURNS bigint LANGUAGE SQL
 AS $$
 SELECT count(*) FROM (SELECT * FROM jsonb_object_keys($1)) t
 $$;
+$r$);
 
 -- Check multi_cat_agg() aggregate which is used to implement jsonb_object_agg()
 

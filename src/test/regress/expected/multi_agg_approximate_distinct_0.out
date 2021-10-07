@@ -151,8 +151,20 @@ SELECT
 	GROUP BY l_orderkey
 	ORDER BY 2 DESC, 1 DESC
 	LIMIT 10;
-ERROR:  cannot compute count (distinct) approximation
-HINT:  You need to have the hll extension loaded.
+ l_orderkey | count | count | count
+---------------------------------------------------------------------
+      12005 |     4 |     4 |     4
+       5409 |     4 |     4 |     4
+       4964 |     4 |     4 |     4
+      14848 |     3 |     3 |     3
+      14496 |     3 |     3 |     3
+      13473 |     3 |     3 |     3
+      13122 |     3 |     3 |     3
+      12929 |     3 |     3 |     3
+      12645 |     3 |     3 |     3
+      12417 |     3 |     3 |     3
+(10 rows)
+
 -- Check that we can revert config and disable count(distinct) approximations
 SET citus.count_distinct_error_rate = 0.0;
 SELECT count(distinct l_orderkey) FROM lineitem;

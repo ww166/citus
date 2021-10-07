@@ -9,6 +9,7 @@
 
 SET citus.explain_distributed_queries TO off;
 SET client_min_messages TO DEBUG2;
+SET citus.enable_repartition_joins TO on;
 
 
 SELECT sum(l_linenumber), avg(l_linenumber) FROM lineitem, orders
