@@ -104,7 +104,8 @@ SELECT shardminvalue, shardmaxvalue FROM pg_dist_shard
 
 SELECT * FROM t_append ORDER BY id;
 
-\copy t_append FROM STDIN DELIMITER ','
+SELECT master_create_empty_shard('t_append');
+\copy t_append FROM STDIN with (DELIMITER ',', append_to_shard 102303)
 9,2
 10,3
 11,4

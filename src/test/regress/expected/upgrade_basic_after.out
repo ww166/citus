@@ -308,8 +308,8 @@ SELECT shardminvalue, shardmaxvalue FROM pg_dist_shard
   ORDER BY shardminvalue, shardmaxvalue;
  shardminvalue | shardmaxvalue
 ---------------------------------------------------------------------
- 1             | 3
- 5             | 7
+               |
+               |
 (2 rows)
 
 SELECT * FROM t_append ORDER BY id;
@@ -323,15 +323,21 @@ SELECT * FROM t_append ORDER BY id;
   7 |       4
 (6 rows)
 
-\copy t_append FROM STDIN DELIMITER ','
+SELECT master_create_empty_shard('t_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    102303
+(1 row)
+
+\copy t_append FROM STDIN with (DELIMITER ',', append_to_shard xxxxx)
 SELECT shardminvalue, shardmaxvalue FROM pg_dist_shard
   WHERE logicalrelid = 't_append'::regclass
   ORDER BY shardminvalue, shardmaxvalue;
  shardminvalue | shardmaxvalue
 ---------------------------------------------------------------------
- 1             | 3
- 5             | 7
- 9             | 11
+               |
+               |
+               |
 (3 rows)
 
 SELECT * FROM t_append ORDER BY id;

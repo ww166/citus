@@ -70,11 +70,23 @@ CREATE OR REPLACE FUNCTION pg_catalog.master_create_worker_shards(table_name tex
     AS 'citus', $$master_create_worker_shards$$
     LANGUAGE C STRICT;
 CREATE TABLE t_append(id int, value_1 int);
-SELECT master_create_distributed_table('t_append', 'id', 'append');
- master_create_distributed_table
+SELECT create_distributed_table('t_append', 'id', 'append');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
 
-\copy t_append FROM STDIN DELIMITER ','
-\copy t_append FROM STDIN DELIMITER ','
+SELECT master_create_empty_shard('t_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    102137
+(1 row)
+
+SELECT master_create_empty_shard('t_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    102138
+(1 row)
+
+\copy t_append FROM STDIN with (DELIMITER ',', append_to_shard xxxxx)
+\copy t_append FROM STDIN with (DELIMITER ',', append_to_shard xxxxx)

@@ -51,15 +51,17 @@ CREATE OR REPLACE FUNCTION pg_catalog.master_create_worker_shards(table_name tex
     AS 'citus', $$master_create_worker_shards$$
     LANGUAGE C STRICT;
 CREATE TABLE t_append(id int, value_1 int);
-SELECT master_create_distributed_table('t_append', 'id', 'append');
+SELECT create_distributed_table('t_append', 'id', 'append');
+SELECT master_create_empty_shard('t_append');
+SELECT master_create_empty_shard('t_append');
 
-\copy t_append FROM STDIN DELIMITER ','
+\copy t_append FROM STDIN with (DELIMITER ',', append_to_shard 102137)
 1,2
 2,3
 3,4
 \.
 
-\copy t_append FROM STDIN DELIMITER ','
+\copy t_append FROM STDIN with (DELIMITER ',', append_to_shard 102138)
 5,2
 6,3
 7,4
