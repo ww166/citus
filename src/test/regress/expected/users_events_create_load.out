@@ -1,0 +1,16 @@
+CREATE TABLE users_table (user_id int, time timestamp, value_1 int, value_2 int, value_3 float, value_4 bigint);
+SELECT create_distributed_table('users_table', 'user_id');
+ create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+CREATE TABLE events_table (user_id int, time timestamp, event_type int, value_2 int, value_3 float, value_4 bigint);
+SELECT create_distributed_table('events_table', 'user_id');
+ create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+COPY users_table FROM STDIN WITH CSV;
+COPY events_table FROM STDIN WITH CSV;
