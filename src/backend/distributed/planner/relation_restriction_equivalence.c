@@ -523,16 +523,16 @@ RestrictionEquivalenceForPartitionKeys(PlannerRestrictionContext *restrictionCon
 	{
 		return false;
 	}
-	else if (!ContainsMultipleDistributedRelations(restrictionContext))
-	{
-		/* there is a single distributed relation, no need to continue */
-		return true;
-	}
 	else if (ContextContainsAppendRelation(
 				 restrictionContext->relationRestrictionContext))
 	{
 		/* we never consider append-distributed tables co-located */
 		return false;
+	}
+	else if (!ContainsMultipleDistributedRelations(restrictionContext))
+	{
+		/* there is a single distributed relation, no need to continue */
+		return true;
 	}
 
 	List *attributeEquivalenceList = GenerateAllAttributeEquivalences(restrictionContext);
