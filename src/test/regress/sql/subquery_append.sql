@@ -1,18 +1,20 @@
 CREATE SCHEMA subquery_append;
 SET search_path TO subquery_append;
+SET citus.next_shard_id TO 808010;
 
 CREATE TABLE append_table (key text, value int, extra int default 0);
 CREATE INDEX ON append_table (key);
 
 SELECT create_distributed_table('append_table', 'key', 'append');
-SELECT 1 FROM master_create_empty_shard('append_table');
-SELECT 1 FROM master_create_empty_shard('append_table');
+SELECT master_create_empty_shard('append_table');
+SELECT master_create_empty_shard('append_table');
+SELECT master_create_empty_shard('append_table');
 
 CREATE TABLE ref_table (value int);
 CREATE INDEX ON ref_table (value);
 SELECT create_reference_table('ref_table');
 
-\COPY append_table (key,value) FROM STDIN WITH CSV
+\COPY append_table (key,value) FROM STDIN WITH (format 'csv', append_to_shard 808010)
 abc,234
 bcd,123
 bcd,234
@@ -21,7 +23,7 @@ def,456
 efg,234
 \.
 
-\COPY append_table (key,value) FROM STDIN WITH CSV
+\COPY append_table (key,value) FROM STDIN WITH (format 'csv', append_to_shard 808011)
 abc,123
 efg,123
 hij,123

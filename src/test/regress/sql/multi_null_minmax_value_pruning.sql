@@ -4,24 +4,35 @@
 
 -- This test checks that we can handle null min/max values in shard statistics
 -- and that we don't partition or join prune shards that have null values.
+CREATE SCHEMA multi_null_minmax_value_pruning;
+SET search_path TO multi_null_minmax_value_pruning;
 
-
-SET client_min_messages TO DEBUG2;
 SET citus.explain_all_tasks TO on;
--- to avoid differing explain output - executor doesn't matter,
--- because were testing pruning here.
-
--- Change configuration to treat lineitem and orders tables as large
 
 SET citus.log_multi_join_order to true;
 SET citus.enable_repartition_joins to ON;
 
-SELECT shardminvalue, shardmaxvalue from pg_dist_shard WHERE shardid = 290000;
-SELECT shardminvalue, shardmaxvalue from pg_dist_shard WHERE shardid = 290001;
+SET citus.next_shard_id = 290000;
+
+CREATE TABLE lineitem (LIKE public.lineitem);
+SELECT create_distributed_table('lineitem', 'l_orderkey', 'range');
+SELECT master_create_empty_shard('lineitem');
+SELECT master_create_empty_shard('lineitem');
+
+CREATE TABLE orders (LIKE public.orders);
+SELECT create_distributed_table('orders', 'o_orderkey', 'range');
+SELECT master_create_empty_shard('orders');
+SELECT master_create_empty_shard('orders');
+
+SET client_min_messages TO DEBUG2;
+
+UPDATE pg_dist_shard SET shardminvalue = '1', shardmaxvalue = '6000' WHERE shardid = 290000 OR shardid = 290002;
+UPDATE pg_dist_shard SET shardminvalue = '6001', shardmaxvalue = '20000' WHERE shardid = 290001 OR shardid = 290003;
+UPDATE pg_dist_partition SET colocationid = 87091 WHERE logicalrelid = 'orders'::regclass OR logicalrelid = 'lineitem'::regclass;
 
 -- Check that partition and join pruning works when min/max values exist
 -- Adding l_orderkey = 1 to make the query not router executable
-SELECT coordinator_plan($Q$
+SELECT public.coordinator_plan($Q$
 EXPLAIN (COSTS FALSE)
 SELECT l_orderkey, l_linenumber, l_shipdate FROM lineitem WHERE l_orderkey = 9030 or l_orderkey = 1;
 $Q$);
@@ -36,7 +47,7 @@ SELECT sum(l_linenumber), avg(l_linenumber) FROM lineitem, orders
 
 UPDATE pg_dist_shard SET shardminvalue = NULL WHERE shardid = 290000;
 
-SELECT coordinator_plan($Q$
+SELECT public.coordinator_plan($Q$
 EXPLAIN (COSTS FALSE)
 SELECT l_orderkey, l_linenumber, l_shipdate FROM lineitem WHERE l_orderkey = 9030;
 $Q$);
@@ -51,7 +62,7 @@ SELECT sum(l_linenumber), avg(l_linenumber) FROM lineitem, orders
 
 UPDATE pg_dist_shard SET shardmaxvalue = NULL WHERE shardid = 290001;
 
-SELECT coordinator_plan($Q$
+SELECT public.coordinator_plan($Q$
 EXPLAIN (COSTS FALSE)
 SELECT l_orderkey, l_linenumber, l_shipdate FROM lineitem WHERE l_orderkey = 9030;
 $Q$);
@@ -66,7 +77,7 @@ SELECT sum(l_linenumber), avg(l_linenumber) FROM lineitem, orders
 
 UPDATE pg_dist_shard SET shardminvalue = '0' WHERE shardid = 290000;
 
-SELECT coordinator_plan($Q$
+SELECT public.coordinator_plan($Q$
 EXPLAIN (COSTS FALSE)
 SELECT l_orderkey, l_linenumber, l_shipdate FROM lineitem WHERE l_orderkey = 9030;
 $Q$);
@@ -75,9 +86,5 @@ EXPLAIN (COSTS FALSE)
 SELECT sum(l_linenumber), avg(l_linenumber) FROM lineitem, orders
 	WHERE l_partkey = o_custkey;
 
--- Set minimum and maximum values for two shards back to their original values
-
-UPDATE pg_dist_shard SET shardminvalue = '1' WHERE shardid = 290000;
-UPDATE pg_dist_shard SET shardmaxvalue = '14947' WHERE shardid = 290001;
-
-SET client_min_messages TO NOTICE;
+RESET client_min_messages;
+DROP SCHEMA multi_null_minmax_value_pruning CASCADE;

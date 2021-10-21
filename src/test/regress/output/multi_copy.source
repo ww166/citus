@@ -296,16 +296,24 @@ CREATE TABLE customer_copy_append (
         c_acctbal decimal(15,2),
         c_mktsegment char(10),
         c_comment varchar(117));
-SELECT master_create_distributed_table('customer_copy_append', 'c_custkey', 'append');
- master_create_distributed_table
+SELECT create_distributed_table('customer_copy_append', 'c_custkey', 'append');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
 
 -- Test syntax error
-COPY customer_copy_append(c_custkey, c_name) FROM STDIN WITH (FORMAT 'csv');
+BEGIN;
+SELECT master_create_empty_shard('customer_copy_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560130
+(1 row)
+
+COPY customer_copy_append(c_custkey, c_name) FROM STDIN WITH (FORMAT 'csv', append_to_shard xxxxx);
 ERROR:  invalid input syntax for integer: "notinteger"
 CONTEXT:  COPY customer_copy_append, line 3, column c_custkey: "notinteger"
+END;
 -- Test that no shard is created for failing copy
 SELECT count(*) FROM pg_dist_shard WHERE logicalrelid = 'customer_copy_append'::regclass;
  count
@@ -314,16 +322,32 @@ SELECT count(*) FROM pg_dist_shard WHERE logicalrelid = 'customer_copy_append'::
 (1 row)
 
 -- Test empty copy
-COPY customer_copy_append FROM STDIN;
--- Test that no shard is created for copying zero rows
+BEGIN;
+SELECT master_create_empty_shard('customer_copy_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560131
+(1 row)
+
+COPY customer_copy_append FROM STDIN WITH (append_to_shard xxxxx);
+END;
+-- Test that a shard is created
 SELECT count(*) FROM pg_dist_shard WHERE logicalrelid = 'customer_copy_append'::regclass;
  count
 ---------------------------------------------------------------------
-     0
+     1
 (1 row)
 
 -- Test proper copy
-COPY customer_copy_append(c_custkey, c_name) FROM STDIN WITH (FORMAT 'csv');
+BEGIN;
+SELECT master_create_empty_shard('customer_copy_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560132
+(1 row)
+
+COPY customer_copy_append(c_custkey, c_name) FROM STDIN WITH (FORMAT 'csv', append_to_shard xxxxx);
+END;
 -- Check whether data was copied properly
 SELECT * FROM customer_copy_append;
  c_custkey |  c_name   | c_address | c_nationkey | c_phone | c_acctbal | c_mktsegment | c_comment
@@ -333,39 +357,39 @@ SELECT * FROM customer_copy_append;
 (2 rows)
 
 -- Manipulate manipulate and check shard statistics for append-partitioned table shard
-UPDATE pg_dist_shard SET shardminvalue = 1501, shardmaxvalue = 2000 WHERE shardid = 560131;
-UPDATE pg_dist_shard_placement SET shardlength = 0 WHERE shardid = 560131;
-SELECT shardid, shardminvalue, shardmaxvalue FROM pg_dist_shard WHERE shardid = 560131;
+UPDATE pg_dist_shard SET shardminvalue = 1501, shardmaxvalue = 2000 WHERE shardid = 560132;
+UPDATE pg_dist_shard_placement SET shardlength = 0 WHERE shardid = 560132;
+SELECT shardid, shardminvalue, shardmaxvalue FROM pg_dist_shard WHERE shardid = 560132;
  shardid | shardminvalue | shardmaxvalue
 ---------------------------------------------------------------------
-  560131 | 1501          | 2000
+  560132 | 1501          | 2000
 (1 row)
 
-SELECT shardid, shardlength FROM pg_dist_shard_placement WHERE shardid = 560131;
+SELECT shardid, shardlength FROM pg_dist_shard_placement WHERE shardid = 560132;
  shardid | shardlength
 ---------------------------------------------------------------------
-  560131 |           0
-  560131 |           0
+  560132 |           0
+  560132 |           0
 (2 rows)
 
 -- Update shard statistics for append-partitioned shard
-SELECT master_update_shard_statistics(560131);
+SELECT master_update_shard_statistics(560132);
  master_update_shard_statistics
 ---------------------------------------------------------------------
                            8192
 (1 row)
 
-SELECT shardid, shardminvalue, shardmaxvalue FROM pg_dist_shard WHERE shardid = 560131;
+SELECT shardid, shardminvalue, shardmaxvalue FROM pg_dist_shard WHERE shardid = 560132;
  shardid | shardminvalue | shardmaxvalue
 ---------------------------------------------------------------------
-  560131 | 1             | 2
+  560132 | 1             | 2
 (1 row)
 
-SELECT shardid, shardlength FROM pg_dist_shard_placement WHERE shardid = 560131;
+SELECT shardid, shardlength FROM pg_dist_shard_placement WHERE shardid = 560132;
  shardid | shardlength
 ---------------------------------------------------------------------
-  560131 |        8192
-  560131 |        8192
+  560132 |        8192
+  560132 |        8192
 (2 rows)
 
 -- Create lineitem table
@@ -386,45 +410,26 @@ CREATE TABLE lineitem_copy_append (
         l_shipinstruct char(25) not null,
         l_shipmode char(10) not null,
         l_comment varchar(44) not null);
-SELECT master_create_distributed_table('lineitem_copy_append', 'l_orderkey', 'append');
- master_create_distributed_table
+SELECT create_distributed_table('lineitem_copy_append', 'l_orderkey', 'append');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
 
--- Test multiple shard creation
-SET citus.shard_max_size TO '256kB';
-COPY lineitem_copy_append FROM '@abs_srcdir@/data/lineitem.1.data' with delimiter '|';
+BEGIN;
+SELECT master_create_empty_shard('lineitem_copy_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560133
+(1 row)
+
+COPY lineitem_copy_append FROM '@abs_srcdir@/data/lineitem.1.data' with (delimiter '|', append_to_shard xxxxx);
+END;
 SELECT count(*) FROM pg_dist_shard WHERE logicalrelid = 'lineitem_copy_append'::regclass;
  count
 ---------------------------------------------------------------------
-     5
+     1
 (1 row)
-
--- Test round robin shard policy
-SET citus.shard_replication_factor TO 1;
-COPY lineitem_copy_append FROM '@abs_srcdir@/data/lineitem.2.data' with delimiter '|';
-SELECT
-        pg_dist_shard_placement.shardid,
-        pg_dist_shard_placement.nodeport
-FROM
-        pg_dist_shard,
-        pg_dist_shard_placement
-WHERE
-        pg_dist_shard.shardid = pg_dist_shard_placement.shardid AND
-        logicalrelid = 'lineitem_copy_append'::regclass
-ORDER BY
-        pg_dist_shard.shardid DESC
-LIMIT
-        5;
- shardid | nodeport
----------------------------------------------------------------------
-  560141 |    57637
-  560140 |    57638
-  560139 |    57637
-  560138 |    57638
-  560137 |    57637
-(5 rows)
 
 -- Test schema support on append partitioned tables
 CREATE SCHEMA append;
@@ -437,15 +442,27 @@ CREATE TABLE append.customer_copy (
         c_acctbal decimal(15,2),
         c_mktsegment char(10),
         c_comment varchar(117));
-SELECT master_create_distributed_table('append.customer_copy', 'c_custkey', 'append');
- master_create_distributed_table
+SELECT create_distributed_table('append.customer_copy', 'c_custkey', 'append');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
 
+SELECT master_create_empty_shard('append.customer_copy');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560134
+(1 row)
+
+SELECT master_create_empty_shard('append.customer_copy');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560135
+(1 row)
+
 -- Test copy from the master node
-COPY append.customer_copy FROM '@abs_srcdir@/data/customer.1.data' with (delimiter '|');
-COPY append.customer_copy FROM '@abs_srcdir@/data/customer.2.data' with (delimiter '|');
+COPY append.customer_copy FROM '@abs_srcdir@/data/customer.1.data' with (delimiter '|', append_to_shard xxxxx);
+COPY append.customer_copy FROM '@abs_srcdir@/data/customer.2.data' with (delimiter '|', append_to_shard xxxxx);
 -- Test the content of the table
 SELECT min(c_custkey), max(c_custkey), avg(c_acctbal), count(*) FROM append.customer_copy;
  min | max  |          avg          | count
@@ -569,13 +586,19 @@ CREATE TABLE packed_numbers_append (
         id integer,
         packed_numbers number_pack[]
 );
-SELECT master_create_distributed_table('packed_numbers_append', 'id', 'append');
- master_create_distributed_table
+SELECT create_distributed_table('packed_numbers_append', 'id', 'append');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
 
-COPY packed_numbers_append FROM :'temp_dir''copy_test_array_of_composite';
+SELECT master_create_empty_shard('packed_numbers_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560152
+(1 row)
+
+COPY packed_numbers_append FROM :'temp_dir''copy_test_array_of_composite' WITH (append_to_shard xxxxx);
 -- Verify data is actually copied
 SELECT * FROM packed_numbers_append;
  id |    packed_numbers
@@ -588,13 +611,19 @@ CREATE TABLE super_packed_numbers_append (
         id integer,
         super_packed_number super_number_pack
 );
-SELECT master_create_distributed_table('super_packed_numbers_append', 'id', 'append');
- master_create_distributed_table
+SELECT create_distributed_table('super_packed_numbers_append', 'id', 'append');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
 
-COPY super_packed_numbers_append FROM :'temp_dir''copy_test_composite_of_composite';
+SELECT master_create_empty_shard('super_packed_numbers_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560153
+(1 row)
+
+COPY super_packed_numbers_append FROM :'temp_dir''copy_test_composite_of_composite' WITH (append_to_shard xxxxx);
 -- Verify data is actually copied
 SELECT * FROM super_packed_numbers_append;
  id |  super_packed_number
@@ -607,23 +636,23 @@ CREATE TABLE composite_partition_column_table(
         id integer,
         composite_column number_pack
 );
-SELECT master_create_distributed_table('composite_partition_column_table', 'composite_column', 'append');
- master_create_distributed_table
+SELECT create_distributed_table('composite_partition_column_table', 'composite_column', 'append');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
 
-\COPY composite_partition_column_table FROM STDIN WITH (FORMAT 'csv');
-WARNING:  function min(number_pack) does not exist
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
-CONTEXT:  while executing command on localhost:xxxxx
-WARNING:  could not get statistics for shard public.composite_partition_column_table_560162
-DETAIL:  Setting shard statistics to NULL
-ERROR:  failure on connection marked as essential: localhost:xxxxx
+SELECT master_create_empty_shard('composite_partition_column_table');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560154
+(1 row)
+
+\COPY composite_partition_column_table FROM STDIN WITH (FORMAT 'csv', append_to_shard xxxxx);
 -- Test copy on append distributed tables do not create shards on removed workers
 CREATE TABLE numbers_append (a int, b int);
-SELECT master_create_distributed_table('numbers_append', 'a', 'append');
- master_create_distributed_table
+SELECT create_distributed_table('numbers_append', 'a', 'append');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
@@ -636,17 +665,31 @@ SELECT shardid, nodename, nodeport
 ---------------------------------------------------------------------
 (0 rows)
 
-COPY numbers_append FROM STDIN WITH (FORMAT 'csv');
-COPY numbers_append FROM STDIN WITH (FORMAT 'csv');
+SELECT master_create_empty_shard('numbers_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560155
+(1 row)
+
+SELECT master_create_empty_shard('numbers_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560156
+(1 row)
+
+COPY numbers_append FROM STDIN WITH (FORMAT 'csv', append_to_shard xxxxx);
+COPY numbers_append FROM STDIN WITH (FORMAT 'csv', append_to_shard xxxxx);
 -- verify there are shards at both workers
 SELECT shardid, nodename, nodeport
 	FROM pg_dist_shard_placement join pg_dist_shard using(shardid)
 	WHERE logicalrelid = 'numbers_append'::regclass order by placementid;
  shardid | nodename  | nodeport
 ---------------------------------------------------------------------
-  560163 | localhost |    57637
-  560164 | localhost |    57638
-(2 rows)
+  560155 | localhost |    57637
+  560155 | localhost |    57638
+  560156 | localhost |    57638
+  560156 | localhost |    57637
+(4 rows)
 
 -- disable the first node
 SELECT master_disable_node('localhost', :worker_1_port);
@@ -660,18 +703,32 @@ NOTICE:  Node localhost:xxxxx has active shard placements. Some queries may fail
 -- succeed without replication count error
 SET citus.shard_replication_factor TO 1;
 -- add two new shards and verify they are created at the other node
-COPY numbers_append FROM STDIN WITH (FORMAT 'csv');
-COPY numbers_append FROM STDIN WITH (FORMAT 'csv');
+SELECT master_create_empty_shard('numbers_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560157
+(1 row)
+
+SELECT master_create_empty_shard('numbers_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560158
+(1 row)
+
+COPY numbers_append FROM STDIN WITH (FORMAT 'csv', append_to_shard xxxxx);
+COPY numbers_append FROM STDIN WITH (FORMAT 'csv', append_to_shard xxxxx);
 SELECT shardid, nodename, nodeport
 	FROM pg_dist_shard_placement join pg_dist_shard using(shardid)
 	WHERE logicalrelid = 'numbers_append'::regclass order by placementid;
  shardid | nodename  | nodeport
 ---------------------------------------------------------------------
-  560163 | localhost |    57637
-  560164 | localhost |    57638
-  560165 | localhost |    57638
-  560166 | localhost |    57638
-(4 rows)
+  560155 | localhost |    57637
+  560155 | localhost |    57638
+  560156 | localhost |    57638
+  560156 | localhost |    57637
+  560157 | localhost |    57638
+  560158 | localhost |    57638
+(6 rows)
 
 -- add the node back
 SET client_min_messages TO ERROR;
@@ -684,22 +741,36 @@ SELECT 1 FROM master_activate_node('localhost', :worker_1_port);
 RESET client_min_messages;
 RESET citus.shard_replication_factor;
 -- add two new shards and verify they are created at both workers
-COPY numbers_append FROM STDIN WITH (FORMAT 'csv');
-COPY numbers_append FROM STDIN WITH (FORMAT 'csv');
+SELECT master_create_empty_shard('numbers_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560159
+(1 row)
+
+SELECT master_create_empty_shard('numbers_append');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    560160
+(1 row)
+
+COPY numbers_append FROM STDIN WITH (FORMAT 'csv', append_to_shard xxxxx);
+COPY numbers_append FROM STDIN WITH (FORMAT 'csv', append_to_shard xxxxx);
 SELECT shardid, nodename, nodeport
 	FROM pg_dist_shard_placement join pg_dist_shard using(shardid)
 	WHERE logicalrelid = 'numbers_append'::regclass order by placementid;
  shardid | nodename  | nodeport
 ---------------------------------------------------------------------
-  560163 | localhost |    57637
-  560164 | localhost |    57638
-  560165 | localhost |    57638
-  560166 | localhost |    57638
-  560167 | localhost |    57637
-  560167 | localhost |    57638
-  560168 | localhost |    57638
-  560168 | localhost |    57637
-(8 rows)
+  560155 | localhost |    57637
+  560155 | localhost |    57638
+  560156 | localhost |    57638
+  560156 | localhost |    57637
+  560157 | localhost |    57638
+  560158 | localhost |    57638
+  560159 | localhost |    57637
+  560159 | localhost |    57638
+  560160 | localhost |    57638
+  560160 | localhost |    57637
+(10 rows)
 
 DROP TABLE numbers_append;
 -- Test copy failures against connection failures
@@ -730,14 +801,14 @@ SELECT shardid, shardstate, nodename, nodeport
 	WHERE logicalrelid = 'numbers_hash'::regclass order by shardid, nodeport;
  shardid | shardstate | nodename  | nodeport
 ---------------------------------------------------------------------
-  560169 |          1 | localhost |    57637
-  560169 |          1 | localhost |    57638
-  560170 |          1 | localhost |    57637
-  560170 |          1 | localhost |    57638
-  560171 |          1 | localhost |    57637
-  560171 |          1 | localhost |    57638
-  560172 |          1 | localhost |    57637
-  560172 |          1 | localhost |    57638
+  560161 |          1 | localhost |    57637
+  560161 |          1 | localhost |    57638
+  560162 |          1 | localhost |    57637
+  560162 |          1 | localhost |    57638
+  560163 |          1 | localhost |    57637
+  560163 |          1 | localhost |    57638
+  560164 |          1 | localhost |    57637
+  560164 |          1 | localhost |    57638
 (8 rows)
 
 -- create a reference table
@@ -762,14 +833,14 @@ SELECT shardid, shardstate, nodename, nodeport
 	WHERE logicalrelid = 'numbers_hash_other'::regclass order by shardid, nodeport;
  shardid | shardstate | nodename  | nodeport
 ---------------------------------------------------------------------
-  560174 |          1 | localhost |    57637
-  560174 |          1 | localhost |    57638
-  560175 |          1 | localhost |    57637
-  560175 |          1 | localhost |    57638
-  560176 |          1 | localhost |    57637
-  560176 |          1 | localhost |    57638
-  560177 |          1 | localhost |    57637
-  560177 |          1 | localhost |    57638
+  560166 |          1 | localhost |    57637
+  560166 |          1 | localhost |    57638
+  560167 |          1 | localhost |    57637
+  560167 |          1 | localhost |    57638
+  560168 |          1 | localhost |    57637
+  560168 |          1 | localhost |    57638
+  560169 |          1 | localhost |    57637
+  560169 |          1 | localhost |    57638
 (8 rows)
 
 -- manually corrupt pg_dist_shard such that both copies of one shard is placed in
@@ -800,14 +871,14 @@ SELECT shardid, shardstate, nodename, nodeport
 	WHERE logicalrelid = 'numbers_hash'::regclass order by shardid, nodeport;
  shardid | shardstate | nodename  | nodeport
 ---------------------------------------------------------------------
-  560169 |          3 | localhost |    57637
-  560169 |          1 | localhost |    57638
-  560170 |          3 | localhost |    57637
-  560170 |          1 | localhost |    57638
-  560171 |          3 | localhost |    57637
-  560171 |          1 | localhost |    57638
-  560172 |          3 | localhost |    57637
-  560172 |          1 | localhost |    57638
+  560161 |          3 | localhost |    57637
+  560161 |          1 | localhost |    57638
+  560162 |          3 | localhost |    57637
+  560162 |          1 | localhost |    57638
+  560163 |          3 | localhost |    57637
+  560163 |          1 | localhost |    57638
+  560164 |          3 | localhost |    57637
+  560164 |          1 | localhost |    57638
 (8 rows)
 
 -- try to insert into a reference table copy should fail
@@ -820,8 +891,8 @@ SELECT shardid, shardstate, nodename, nodeport
 	WHERE logicalrelid = 'numbers_reference'::regclass order by placementid;
  shardid | shardstate | nodename  | nodeport
 ---------------------------------------------------------------------
-  560173 |          1 | localhost |    57637
-  560173 |          1 | localhost |    57638
+  560165 |          1 | localhost |    57637
+  560165 |          1 | localhost |    57638
 (2 rows)
 
 -- try to insert into numbers_hash_other. copy should fail and rollback
@@ -841,22 +912,19 @@ SELECT shardid, shardstate, nodename, nodeport
 	WHERE logicalrelid = 'numbers_hash_other'::regclass order by shardid, nodeport;
  shardid | shardstate | nodename  | nodeport
 ---------------------------------------------------------------------
-  560174 |          3 | localhost |    57637
-  560174 |          1 | localhost |    57638
-  560175 |          3 | localhost |    57637
-  560175 |          1 | localhost |    57638
-  560176 |          1 | localhost |    57637
-  560176 |          1 | localhost |    57638
-  560177 |          3 | localhost |    57637
-  560177 |          1 | localhost |    57638
+  560166 |          3 | localhost |    57637
+  560166 |          1 | localhost |    57638
+  560167 |          3 | localhost |    57637
+  560167 |          1 | localhost |    57638
+  560168 |          1 | localhost |    57637
+  560168 |          1 | localhost |    57638
+  560169 |          3 | localhost |    57637
+  560169 |          1 | localhost |    57638
 (8 rows)
 
 -- re-enable test_user on the first worker
 \c - :default_user - :worker_1_port
 ALTER USER test_user WITH login;
--- there is a dangling shard in worker_2, drop it
-\c - test_user - :worker_2_port
-DROP TABLE numbers_hash_other_560176;
 \c - test_user - :master_port
 DROP TABLE numbers_hash;
 DROP TABLE numbers_hash_other;
@@ -873,13 +941,13 @@ SELECT create_distributed_table('numbers_hash', 'a');
 (1 row)
 
 \c - - - :worker_1_port
-ALTER TABLE numbers_hash_560180 DROP COLUMN b;
+ALTER TABLE numbers_hash_560170 DROP COLUMN b;
 \c - - - :master_port
 -- operation will fail to modify a shard and roll back
 COPY numbers_hash FROM STDIN WITH (FORMAT 'csv');
-ERROR:  column "b" of relation "numbers_hash_560180" does not exist
+ERROR:  column "b" of relation "numbers_hash_560170" does not exist
 CONTEXT:  while executing command on localhost:xxxxx
-COPY numbers_hash, line 6: "6,6"
+COPY numbers_hash, line 1: "1,1"
 -- verify no row is inserted
 SELECT count(a) FROM numbers_hash;
  count
@@ -893,14 +961,14 @@ SELECT shardid, shardstate, nodename, nodeport
 	WHERE logicalrelid = 'numbers_hash'::regclass order by shardid, nodeport;
  shardid | shardstate | nodename  | nodeport
 ---------------------------------------------------------------------
-  560178 |          1 | localhost |    57637
-  560178 |          1 | localhost |    57638
-  560179 |          1 | localhost |    57637
-  560179 |          1 | localhost |    57638
-  560180 |          1 | localhost |    57637
-  560180 |          1 | localhost |    57638
-  560181 |          1 | localhost |    57637
-  560181 |          1 | localhost |    57638
+  560170 |          1 | localhost |    57637
+  560170 |          1 | localhost |    57638
+  560171 |          1 | localhost |    57637
+  560171 |          1 | localhost |    57638
+  560172 |          1 | localhost |    57637
+  560172 |          1 | localhost |    57638
+  560173 |          1 | localhost |    57637
+  560173 |          1 | localhost |    57638
 (8 rows)
 
 DROP TABLE numbers_hash;

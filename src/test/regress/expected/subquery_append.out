@@ -1,5 +1,6 @@
 CREATE SCHEMA subquery_append;
 SET search_path TO subquery_append;
+SET citus.next_shard_id TO 808010;
 CREATE TABLE append_table (key text, value int, extra int default 0);
 CREATE INDEX ON append_table (key);
 SELECT create_distributed_table('append_table', 'key', 'append');
@@ -8,16 +9,22 @@ SELECT create_distributed_table('append_table', 'key', 'append');
 
 (1 row)
 
-SELECT 1 FROM master_create_empty_shard('append_table');
- ?column?
+SELECT master_create_empty_shard('append_table');
+ master_create_empty_shard
 ---------------------------------------------------------------------
-        1
+                    808010
 (1 row)
 
-SELECT 1 FROM master_create_empty_shard('append_table');
- ?column?
+SELECT master_create_empty_shard('append_table');
+ master_create_empty_shard
 ---------------------------------------------------------------------
-        1
+                    808011
+(1 row)
+
+SELECT master_create_empty_shard('append_table');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                    808012
 (1 row)
 
 CREATE TABLE ref_table (value int);
@@ -28,8 +35,8 @@ SELECT create_reference_table('ref_table');
 
 (1 row)
 
-\COPY append_table (key,value) FROM STDIN WITH CSV
-\COPY append_table (key,value) FROM STDIN WITH CSV
+\COPY append_table (key,value) FROM STDIN WITH (format 'csv', append_to_shard xxxxx)
+\COPY append_table (key,value) FROM STDIN WITH (format 'csv', append_to_shard xxxxx)
 \COPY ref_table FROM STDIN WITH CSV
 -- exercise some optimizer pushdown features with subqueries
 SELECT count(*) FROM (SELECT random() FROM append_table) u;

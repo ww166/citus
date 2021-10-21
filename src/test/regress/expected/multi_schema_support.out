@@ -115,13 +115,19 @@ CREATE TABLE nation_append_search_path(
     n_regionkey integer not null,
     n_comment varchar(152)
 );
-SELECT master_create_distributed_table('nation_append_search_path', 'n_nationkey', 'append');
- master_create_distributed_table
+SELECT create_distributed_table('nation_append_search_path', 'n_nationkey', 'append');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
 
-\copy nation_append_search_path FROM STDIN with delimiter '|';
+SELECT master_create_empty_shard('nation_append_search_path');
+ master_create_empty_shard
+---------------------------------------------------------------------
+                   1190002
+(1 row)
+
+\copy nation_append_search_path FROM STDIN with (delimiter '|', append_to_shard xxxxx);
 -- create shard with master_create_worker_shards
 CREATE TABLE test_schema_support.nation_hash(
     n_nationkey integer not null,
