@@ -88,7 +88,9 @@ static char * TruncateTriggerCreateCommand(Oid relationId);
 static char * SchemaOwnerName(Oid objectId);
 static bool HasMetadataWorkers(void);
 static List * DetachPartitionCommandList(void);
-static bool SyncMetadataSnapshotToNode(WorkerNode *workerNode, bool raiseOnError);
+static MetadataSyncResult SyncNodesMetadataToNodes(void);
+static bool SyncNodesMetadataToNode(WorkerNode *workerNode, bool raiseError);
+static void SyncMetadataSnapshotToNode(WorkerNode *workerNode);
 static void DropMetadataSnapshotOnNode(WorkerNode *workerNode);
 static char * CreateSequenceDependencyCommand(Oid relationId, Oid sequenceId,
 											  char *columnName);
@@ -229,9 +231,7 @@ StartMetadataSyncToNode(const char *nodeNameString, int32 nodePort)
 		return;
 	}
 
-	/* fail if metadata synchronization doesn't succeed */
-	bool raiseInterrupts = true;
-	SyncMetadataSnapshotToNode(workerNode, raiseInterrupts);
+	SyncMetadataSnapshotToNode(workerNode);
 }
 
 
@@ -404,10 +404,9 @@ ShouldSyncTableMetadata(Oid relationId)
  *  1. Sets the localGroupId on the worker so the worker knows which tuple in
  *     pg_dist_node represents itself.
  *  2. Recreates the distributed metadata on the given worker.
- * If raiseOnError is true, it errors out if synchronization fails.
  */
-static bool
-SyncMetadataSnapshotToNode(WorkerNode *workerNode, bool raiseOnError)
+static void
+SyncMetadataSnapshotToNode(WorkerNode *workerNode)
 {
 	char *currentUser = CurrentUserName();
 
@@ -428,16 +427,44 @@ SyncMetadataSnapshotToNode(WorkerNode *workerNode, bool raiseOnError)
 
 	/*
 	 * Send the snapshot recreation commands in a single remote transaction and
-	 * if requested, error out in any kind of failure. Note that it is not
-	 * required to send createMetadataSnapshotCommandList in the same transaction
-	 * that we send nodeDeleteCommand and nodeInsertCommand commands below.
+	 * error out in any kind of failure.
+	 */
+	SendCommandListToWorkerInCoordinatedTransaction(workerNode->workerName,
+													workerNode->workerPort,
+													currentUser,
+													recreateMetadataSnapshotCommandList);
+}
+
+
+/*
+ * SyncNodesMetadataToNode synchronizes pg_dist_node to the given node.
+ * If raiseOnError is true, it errors out if synchronization fails.
+ */
+static bool
+SyncNodesMetadataToNode(WorkerNode *workerNode, bool raiseOnError)
+{
+	char *currentUser = CurrentUserName();
+	List *commandList = NIL;
+	bool includeNodesFromOtherClusters = true;
+	List *workerNodeList = ReadDistNode(includeNodesFromOtherClusters);
+
+	/* delete all records from pg_dist_node */
+	commandList = lappend(commandList, DELETE_ALL_NODES);
+
+	/* insert all nodes into pg_dist_node */
+	char *nodeListInsertCommand = NodeListInsertCommand(workerNodeList);
+	commandList = lappend(commandList, nodeListInsertCommand);
+
+	/*
+	 * Send the pg_dist_node recreation commands in a single remote transaction and
+	 * if requested, error out in any kind of failure.
 	 */
 	if (raiseOnError)
 	{
 		SendCommandListToWorkerInCoordinatedTransaction(workerNode->workerName,
 														workerNode->workerPort,
 														currentUser,
-														recreateMetadataSnapshotCommandList);
+														commandList);
 		return true;
 	}
 	else
@@ -445,7 +472,7 @@ SyncMetadataSnapshotToNode(WorkerNode *workerNode, bool raiseOnError)
 		bool success =
 			SendOptionalCommandListToWorkerInCoordinatedTransaction(
 				workerNode->workerName, workerNode->workerPort,
-				currentUser, recreateMetadataSnapshotCommandList);
+				currentUser, commandList);
 
 		return success;
 	}
@@ -1743,12 +1770,12 @@ DetachPartitionCommandList(void)
 
 
 /*
- * SyncMetadataToNodes tries recreating the metadata snapshot in the
+ * SyncNodesMetadataToNodes tries recreating the metadata snapshot in the
  * metadata workers that are out of sync. Returns the result of
  * synchronization.
  */
 static MetadataSyncResult
-SyncMetadataToNodes(void)
+SyncNodesMetadataToNodes(void)
 {
 	MetadataSyncResult result = METADATA_SYNC_SUCCESS;
 
@@ -1775,7 +1802,7 @@ SyncMetadataToNodes(void)
 		if (workerNode->hasMetadata && !workerNode->metadataSynced)
 		{
 			bool raiseInterrupts = false;
-			if (!SyncMetadataSnapshotToNode(workerNode, raiseInterrupts))
+			if (!SyncNodesMetadataToNode(workerNode, raiseInterrupts))
 			{
 				ereport(WARNING, (errmsg("failed to sync metadata to %s:%d",
 										 workerNode->workerName,
@@ -1854,7 +1881,7 @@ SyncMetadataToNodesMain(Datum main_arg)
 		else if (CheckCitusVersion(DEBUG1) && CitusHasBeenLoaded())
 		{
 			UseCoordinatedTransaction();
-			MetadataSyncResult result = SyncMetadataToNodes();
+			MetadataSyncResult result = SyncNodesMetadataToNodes();
 
 			syncedAllNodes = (result == METADATA_SYNC_SUCCESS);
 
