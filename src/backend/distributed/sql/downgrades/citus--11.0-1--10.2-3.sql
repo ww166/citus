@@ -24,3 +24,6 @@ CREATE FUNCTION pg_catalog.master_get_table_metadata(
     AS 'MODULE_PATHNAME', $$master_get_table_metadata$$;
 COMMENT ON FUNCTION master_get_table_metadata(relation_name text)
     IS 'fetch metadata values for the table';
+
+DROP FUNCTION pg_catalog.worker_partition_query_result(text, text, int, citus.distribution_type, text[], text[], boolean, boolean, boolean);
+#include "../udfs/worker_partition_query_result/9.2-1.sql"

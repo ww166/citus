@@ -69,6 +69,12 @@ typedef struct PartitionedResultDestReceiver
 	 * writes it to a result file.
 	 */
 	DestReceiver **partitionDestReceivers;
+
+	/* whether to skip over NULL partition column values (not needed for joins) */
+	bool skipNullPartitionColumnValue;
+
+	/* whether to generate files for empty partitions */
+	bool generateEmptyResults;
 } PartitionedResultDestReceiver;
 
 static Portal StartPortalForQueryExecution(const char *queryString);
@@ -137,6 +143,8 @@ worker_partition_query_result(PG_FUNCTION_ARGS)
 	int32 maxValuesCount = ArrayObjectCount(maxValuesArray);
 
 	bool binaryCopy = PG_GETARG_BOOL(6);
+	bool skipNullPartitionColumnValue = PG_GETARG_BOOL(7);
+	bool generateEmptyResults = PG_GETARG_BOOL(8);
 
 	if (!IsMultiStatementTransaction())
 	{
@@ -206,6 +214,9 @@ worker_partition_query_result(PG_FUNCTION_ARGS)
 		CreatePartitionedResultDestReceiver(resultIdPrefixString, partitionColumnIndex,
 											partitionCount, tupleDescriptor, binaryCopy,
 											shardSearchInfo, tupleContext);
+
+	dest->skipNullPartitionColumnValue = skipNullPartitionColumnValue;
+	dest->generateEmptyResults = generateEmptyResults;
 
 	/* execute the query */
 	PortalRun(portal, FETCH_ALL, false, true, (DestReceiver *) dest,
@@ -403,21 +414,34 @@ static void
 PartitionedResultDestReceiverStartup(DestReceiver *copyDest, int operation,
 									 TupleDesc inputTupleDescriptor)
 {
-	/*
-	 * We don't expect this to be called multiple times, but if it happens,
-	 * we will just overwrite previous files.
-	 */
 	PartitionedResultDestReceiver *partitionedDest =
 		(PartitionedResultDestReceiver *) copyDest;
+
+	/*
+	 * If generateEmptyResults is enabled, we create and open files for each
+	 * partition upfront. Otherwise, we create and open files in
+	 * PartitionedResultDestReceiverReceive as needed.
+	 */
+
+	if (!partitionedDest->generateEmptyResults)
+	{
+		return;
+	}
+
 	int partitionCount = partitionedDest->partitionCount;
 	for (int partitionIndex = 0; partitionIndex < partitionCount; partitionIndex++)
 	{
-		DestReceiver *partitionDest =
-			partitionedDest->partitionDestReceivers[partitionIndex];
-		if (partitionDest != NULL)
-		{
-			partitionDest->rStartup(partitionDest, operation, inputTupleDescriptor);
-		}
+		StringInfo resultId = makeStringInfo();
+		appendStringInfo(resultId, "%s_%d", partitionedDest->resultIdPrefix,
+						 partitionIndex);
+		char *filePath = QueryResultFileName(resultId->data);
+
+		DestReceiver *partitionDest = CreateFileDestReceiver(filePath,
+															 partitionedDest->
+															 perTupleContext,
+															 partitionedDest->binaryCopy);
+		partitionedDest->partitionDestReceivers[partitionIndex] = partitionDest;
+		partitionDest->rStartup(partitionDest, 0, partitionedDest->tupleDescriptor);
 	}
 }
 
@@ -437,23 +461,37 @@ PartitionedResultDestReceiverReceive(TupleTableSlot *slot, DestReceiver *copyDes
 	Datum *columnValues = slot->tts_values;
 	bool *columnNulls = slot->tts_isnull;
 
+	int partitionIndex;
+
 	if (columnNulls[partitionedDest->partitionColumnIndex])
 	{
-		ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
-						errmsg("the partition column value cannot be NULL")));
+		if (partitionedDest->skipNullPartitionColumnValue)
+		{
+			/* skip over this tuple, it is not needed for the join */
+			return true;
+		}
+		else
+		{
+			ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+							errmsg("the partition column value cannot be NULL")));
+		}
 	}
-
-	Datum partitionColumnValue = columnValues[partitionedDest->partitionColumnIndex];
-	ShardInterval *shardInterval = FindShardInterval(partitionColumnValue,
-													 partitionedDest->shardSearchInfo);
-	if (shardInterval == NULL)
+	else
 	{
-		ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						errmsg("could not find shard for partition column "
-							   "value")));
+		/* look up a (virtual) shard interval based on the partitino column value */
+		Datum partitionColumnValue = columnValues[partitionedDest->partitionColumnIndex];
+		ShardInterval *shardInterval = FindShardInterval(partitionColumnValue,
+														 partitionedDest->shardSearchInfo);
+		if (shardInterval == NULL)
+		{
+			ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+							errmsg("could not find shard for partition column "
+								   "value")));
+		}
+
+		partitionIndex = shardInterval->shardIndex;
 	}
 
-	int partitionIndex = shardInterval->shardIndex;
 	DestReceiver *partitionDest = partitionedDest->partitionDestReceivers[partitionIndex];
 	if (partitionDest == NULL)
 	{

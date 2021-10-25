@@ -17,6 +17,7 @@
 #include "pgstat.h"
 
 #include "catalog/pg_enum.h"
+#include "catalog/pg_type.h"
 #include "commands/copy.h"
 #include "distributed/commands/multi_copy.h"
 #include "distributed/connection_management.h"
@@ -918,6 +919,8 @@ fetch_intermediate_results(PG_FUNCTION_ARGS)
 	StringInfo beginAndSetXactId = BeginAndSetDistributedTransactionIdCommand();
 	ExecuteCriticalRemoteCommand(connection, beginAndSetXactId->data);
 
+	CreateIntermediateResultsDirectory();
+
 	for (resultIndex = 0; resultIndex < resultCount; resultIndex++)
 	{
 		char *resultId = TextDatumGetCString(resultIdArray[resultIndex]);
@@ -940,6 +943,16 @@ fetch_intermediate_results(PG_FUNCTION_ARGS)
 static uint64
 FetchRemoteIntermediateResult(MultiConnection *connection, char *resultId)
 {
+	char *localPath = QueryResultFileName(resultId);
+
+	struct stat fileStat;
+	int statOK = stat(localPath, &fileStat);
+	if (statOK == 0)
+	{
+		/* file exists, skip */
+		return fileStat.st_size;
+	}
+
 	uint64 totalBytesWritten = 0;
 
 	StringInfo copyCommand = makeStringInfo();
@@ -949,8 +962,6 @@ FetchRemoteIntermediateResult(MultiConnection *connection, char *resultId)
 	PGconn *pgConn = connection->pgConn;
 	int socket = PQsocket(pgConn);
 	bool raiseErrors = true;
-
-	CreateIntermediateResultsDirectory();
 
 	appendStringInfo(copyCommand, "COPY \"%s\" TO STDOUT WITH (format result)",
 					 resultId);
@@ -968,7 +979,6 @@ FetchRemoteIntermediateResult(MultiConnection *connection, char *resultId)
 
 	PQclear(result);
 
-	char *localPath = QueryResultFileName(resultId);
 	File fileDesc = FileOpenForTransmit(localPath, fileFlags, fileMode);
 	FileCompat fileCompat = FileCompatFromFileStart(fileDesc);
 
