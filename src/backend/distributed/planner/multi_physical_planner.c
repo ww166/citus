@@ -219,7 +219,7 @@ static void AssignDataFetchDependencies(List *taskList);
 static uint32 TaskListHighestTaskId(List *taskList);
 static List * MapTaskList(MapMergeJob *mapMergeJob, List *filterTaskList);
 static StringInfo CreateMapQueryString(MapMergeJob *mapMergeJob, Task *filterTask,
-									   uint32 partitionColumnIndex);
+									   uint32 partitionColumnIndex, bool useBinaryFormat);
 static char * PartitionResultNamePrefix(uint64 jobId, int32 taskId);
 static char * PartitionResultName(uint64 jobId, uint32 taskId, uint32 partitionId);
 static List * MergeTaskList(MapMergeJob *mapMergeJob, List *mapTaskList,
@@ -4176,8 +4176,8 @@ FragmentAlias(RangeTblEntry *rangeTableEntry, RangeTableFragment *fragment)
 		List *resultNameList = FetchTaskResultNameList(mapOutputFetchTaskList);
 		List *mapJobTargetList = mergeTask->mapJobTargetList;
 
-		/* TODO: determine binary safety automatically */
-		bool useBinaryFormat = BinaryWorkerCopyFormat;
+		/* determine whether all types have binary input/output functions */
+		bool useBinaryFormat = CanUseBinaryCopyFormatForTargetList(mapJobTargetList);
 
 		/* generate the query on the intermediate result */
 		Query *fragmentSetQuery = BuildReadIntermediateResultsArrayQuery(mapJobTargetList,
@@ -4346,11 +4346,15 @@ MapTaskList(MapMergeJob *mapMergeJob, List *filterTaskList)
 													filterQuery->targetList);
 	}
 
+	/* determine whether all types have binary input/output functions */
+	bool useBinaryFormat = CanUseBinaryCopyFormatForTargetList(filterQuery->targetList);
+
 	foreach(filterTaskCell, filterTaskList)
 	{
 		Task *filterTask = (Task *) lfirst(filterTaskCell);
 		StringInfo mapQueryString = CreateMapQueryString(mapMergeJob, filterTask,
-														 partitionColumnResNo);
+														 partitionColumnResNo,
+														 useBinaryFormat);
 
 		/* convert filter query task into map task */
 		Task *mapTask = filterTask;
@@ -4397,7 +4401,7 @@ PartitionColumnIndex(Var *targetVar, List *targetList)
  */
 static StringInfo
 CreateMapQueryString(MapMergeJob *mapMergeJob, Task *filterTask,
-					 uint32 partitionColumnIndex)
+					 uint32 partitionColumnIndex, bool useBinaryFormat)
 {
 	uint64 jobId = filterTask->jobId;
 	uint32 taskId = filterTask->taskId;
@@ -4441,9 +4445,6 @@ CreateMapQueryString(MapMergeJob *mapMergeJob, Task *filterTask,
 
 	char *partitionMethodString = partitionType == RANGE_PARTITION_TYPE ?
 								  "range" : "hash";
-
-	/* TODO: determine binary safety automatically */
-	bool useBinaryFormat = BinaryWorkerCopyFormat;
 
 	/*
 	 * NULL values never match a join condition, so it's ok to skip them.
