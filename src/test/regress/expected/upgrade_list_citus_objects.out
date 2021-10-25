@@ -1,8 +1,8 @@
 -- print version above 11 (eg. 12 and above)
 SHOW server_version \gset
 SELECT substring(:'server_version', '\d+')::int > 11 AS version_above_eleven;
- version_above_eleven
----------------------------------------------------------------------
+ version_above_eleven 
+----------------------
  t
 (1 row)
 
@@ -14,8 +14,8 @@ WHERE refclassid = 'pg_catalog.pg_extension'::pg_catalog.regclass
   AND deptype = 'e'
   AND e.extname='citus'
 ORDER BY 1;
-                                                   description
----------------------------------------------------------------------
+                                                       description                                                       
+-------------------------------------------------------------------------------------------------------------------------
  access method columnar
  event trigger citus_cascade_to_partition
  function alter_columnar_table_reset(regclass,boolean,boolean,boolean,boolean)
@@ -26,7 +26,7 @@ ORDER BY 1;
  function alter_table_set_access_method(regclass,text)
  function any_value(anyelement)
  function any_value_agg(anyelement,anyelement)
- function array_cat_agg(anyarray)
+ function array_cat_agg(anycompatiblearray)
  function assign_distributed_transaction_id(integer,bigint,timestamp with time zone)
  function authinfo_valid(text)
  function broadcast_intermediate_result(text,text)
@@ -212,7 +212,7 @@ ORDER BY 1;
  function worker_partial_agg(oid,anyelement)
  function worker_partial_agg_ffunc(internal)
  function worker_partial_agg_sfunc(internal,oid,anyelement)
- function worker_partition_query_result(text,text,integer,citus.distribution_type,text[],text[],boolean)
+ function worker_partition_query_result(text,text,integer,citus.distribution_type,text[],text[],boolean,boolean,boolean)
  function worker_partitioned_relation_size(regclass)
  function worker_partitioned_relation_total_size(regclass)
  function worker_partitioned_table_size(regclass)

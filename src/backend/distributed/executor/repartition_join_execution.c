@@ -44,10 +44,8 @@
 #include "distributed/worker_transaction.h"
 
 
-static List * CreateTemporarySchemasForMergeTasks(Job *topLevelJob);
 static List * ExtractJobsInJobTree(Job *job);
 static void TraverseJobTree(Job *curJob, List **jobs);
-static char * GenerateCreateSchemasCommand(List *jobIds, char *schemaOwner);
 static char * GenerateJobCommands(List *jobIds, char *templateCommand);
 static char * GenerateDeleteJobsCommand(List *jobIds);
 static void EnsureCompatibleLocalExecutionState(List *taskList);
@@ -67,7 +65,7 @@ ExecuteDependentTasks(List *topLevelTasks, Job *topLevelJob)
 
 	EnsureCompatibleLocalExecutionState(allTasks);
 
-	List *jobIds = CreateTemporarySchemasForMergeTasks(topLevelJob);
+	List *jobIds = ExtractJobsInJobTree(topLevelJob);
 
 	ExecuteTasksInDependencyOrder(allTasks, topLevelTasks, jobIds);
 
@@ -91,21 +89,6 @@ EnsureCompatibleLocalExecutionState(List *taskList)
 	{
 		ErrorIfTransactionAccessedPlacementsLocally();
 	}
-}
-
-
-/*
- * CreateTemporarySchemasForMergeTasks creates the necessary schemas that will be used
- * later in each worker. Single transaction is used to create the schemas.
- */
-static List *
-CreateTemporarySchemasForMergeTasks(Job *topLeveLJob)
-{
-	List *jobIds = ExtractJobsInJobTree(topLeveLJob);
-	char *createSchemasCommand = GenerateCreateSchemasCommand(jobIds, CurrentUserName());
-	SendCommandToWorkersInParallel(ALL_SHARD_NODES, createSchemasCommand,
-								   CitusExtensionOwnerName());
-	return jobIds;
 }
 
 
@@ -139,25 +122,6 @@ TraverseJobTree(Job *curJob, List **jobIds)
 	{
 		TraverseJobTree(childJob, jobIds);
 	}
-}
-
-
-/*
- * GenerateCreateSchemasCommand returns concatanated create schema commands.
- */
-static char *
-GenerateCreateSchemasCommand(List *jobIds, char *ownerName)
-{
-	StringInfo createSchemaCommand = makeStringInfo();
-
-	uint64 *jobIdPointer = NULL;
-	foreach_ptr(jobIdPointer, jobIds)
-	{
-		uint64 jobId = *jobIdPointer;
-		appendStringInfo(createSchemaCommand, WORKER_CREATE_SCHEMA_QUERY,
-						 jobId, quote_literal_cstr(ownerName));
-	}
-	return createSchemaCommand->data;
 }
 
 

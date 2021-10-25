@@ -144,6 +144,7 @@
 #include "distributed/shared_connection_stats.h"
 #include "distributed/distributed_execution_locks.h"
 #include "distributed/intermediate_result_pruning.h"
+#include "distributed/intermediate_results.h"
 #include "distributed/listutils.h"
 #include "distributed/local_executor.h"
 #include "distributed/multi_client_executor.h"
@@ -620,9 +621,7 @@ static DistributedExecution * CreateDistributedExecution(RowModifyLevel modLevel
 														 bool localExecutionSupported);
 static TransactionProperties DecideTransactionPropertiesForTaskList(RowModifyLevel
 																	modLevel,
-																	List *taskList,
-																	bool
-																	exludeFromTransaction);
+																	List *taskList);
 static void StartDistributedExecution(DistributedExecution *execution);
 static void RunLocalExecution(CitusScanState *scanState, DistributedExecution *execution);
 static void RunDistributedExecution(DistributedExecution *execution);
@@ -802,6 +801,9 @@ AdaptiveExecutor(CitusScanState *scanState)
 	bool hasDependentJobs = HasDependentJobs(job);
 	if (hasDependentJobs)
 	{
+		/* jobs use intermediate results, which require a distributed transaction */
+		UseCoordinatedTransaction();
+
 		jobIdList = ExecuteDependentTasks(taskList, job);
 	}
 
@@ -812,8 +814,7 @@ AdaptiveExecutor(CitusScanState *scanState)
 	}
 
 	TransactionProperties xactProperties = DecideTransactionPropertiesForTaskList(
-		distributedPlan->modLevel, taskList,
-		hasDependentJobs);
+		distributedPlan->modLevel, taskList);
 
 	bool localExecutionSupported = true;
 	DistributedExecution *execution = CreateDistributedExecution(
@@ -855,11 +856,6 @@ AdaptiveExecutor(CitusScanState *scanState)
 	}
 
 	FinishDistributedExecution(execution);
-
-	if (hasDependentJobs)
-	{
-		DoRepartitionCleanup(jobIdList);
-	}
 
 	if (SortReturning && distributedPlan->expectResults && commandType != CMD_SELECT)
 	{
@@ -916,7 +912,7 @@ ExecuteUtilityTaskList(List *utilityTaskList, bool localExecutionSupported)
 		modLevel, utilityTaskList, MaxAdaptiveExecutorPoolSize, localExecutionSupported
 		);
 	executionParams->xactProperties =
-		DecideTransactionPropertiesForTaskList(modLevel, utilityTaskList, false);
+		DecideTransactionPropertiesForTaskList(modLevel, utilityTaskList);
 	executionParams->isUtilityCommand = true;
 
 	return ExecuteTaskListExtended(executionParams);
@@ -936,10 +932,8 @@ ExecuteUtilityTaskListExtended(List *utilityTaskList, int poolSize,
 		modLevel, utilityTaskList, poolSize, localExecutionSupported
 		);
 
-	bool excludeFromXact = false;
 	executionParams->xactProperties =
-		DecideTransactionPropertiesForTaskList(modLevel, utilityTaskList,
-											   excludeFromXact);
+		DecideTransactionPropertiesForTaskList(modLevel, utilityTaskList);
 	executionParams->isUtilityCommand = true;
 
 	return ExecuteTaskListExtended(executionParams);
@@ -947,26 +941,19 @@ ExecuteUtilityTaskListExtended(List *utilityTaskList, int poolSize,
 
 
 /*
- * ExecuteTaskListOutsideTransaction is a proxy to ExecuteTaskListExtended
+ * ExecuteTaskList is a proxy to ExecuteTaskListExtended
  * with defaults for some of the arguments.
  */
 uint64
-ExecuteTaskListOutsideTransaction(RowModifyLevel modLevel, List *taskList,
-								  int targetPoolSize, List *jobIdList)
+ExecuteTaskList(RowModifyLevel modLevel, List *taskList)
 {
-	/*
-	 * As we are going to run the tasks outside transaction, we shouldn't use local execution.
-	 * However, there is some problem when using local execution related to
-	 * repartition joins, when we solve that problem, we can execute the tasks
-	 * coming to this path with local execution. See PR:3711
-	 */
-	bool localExecutionSupported = false;
+	bool localExecutionSupported = true;
 	ExecutionParams *executionParams = CreateBasicExecutionParams(
-		modLevel, taskList, targetPoolSize, localExecutionSupported
+		modLevel, taskList, MaxAdaptiveExecutorPoolSize, localExecutionSupported
 		);
 
 	executionParams->xactProperties = DecideTransactionPropertiesForTaskList(
-		modLevel, taskList, true);
+		modLevel, taskList);
 	return ExecuteTaskListExtended(executionParams);
 }
 
@@ -987,7 +974,7 @@ ExecuteTaskListIntoTupleDest(RowModifyLevel modLevel, List *taskList,
 		);
 
 	executionParams->xactProperties = DecideTransactionPropertiesForTaskList(
-		modLevel, taskList, false);
+		modLevel, taskList);
 	executionParams->expectResults = expectResults;
 	executionParams->tupleDestination = tupleDest;
 
@@ -1173,8 +1160,7 @@ CreateDistributedExecution(RowModifyLevel modLevel, List *taskList,
  * errorOnAnyFailure, but not the other way around) we keep them in the same place.
  */
 static TransactionProperties
-DecideTransactionPropertiesForTaskList(RowModifyLevel modLevel, List *taskList, bool
-									   exludeFromTransaction)
+DecideTransactionPropertiesForTaskList(RowModifyLevel modLevel, List *taskList)
 {
 	TransactionProperties xactProperties;
 
@@ -1187,12 +1173,6 @@ DecideTransactionPropertiesForTaskList(RowModifyLevel modLevel, List *taskList, 
 	if (taskList == NIL)
 	{
 		/* nothing to do, return defaults */
-		return xactProperties;
-	}
-
-	if (exludeFromTransaction)
-	{
-		xactProperties.useRemoteTransactionBlocks = TRANSACTION_BLOCKS_DISALLOWED;
 		return xactProperties;
 	}
 
@@ -2358,12 +2338,6 @@ RunDistributedExecution(DistributedExecution *execution)
 		 * unclaim all connections to allow that.
 		 */
 		UnclaimAllSessionConnections(execution->sessionList);
-
-		/* do repartition cleanup if this is a repartition query*/
-		if (list_length(execution->jobIdList) > 0)
-		{
-			DoRepartitionCleanup(execution->jobIdList);
-		}
 
 		if (execution->waitEventSet != NULL)
 		{
