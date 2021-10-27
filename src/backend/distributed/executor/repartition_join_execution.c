@@ -46,8 +46,6 @@
 
 static List * ExtractJobsInJobTree(Job *job);
 static void TraverseJobTree(Job *curJob, List **jobs);
-static char * GenerateJobCommands(List *jobIds, char *templateCommand);
-static char * GenerateDeleteJobsCommand(List *jobIds);
 static void EnsureCompatibleLocalExecutionState(List *taskList);
 
 
@@ -59,8 +57,6 @@ static void EnsureCompatibleLocalExecutionState(List *taskList);
 List *
 ExecuteDependentTasks(List *topLevelTasks, Job *topLevelJob)
 {
-	EnsureNoModificationsHaveBeenDone();
-
 	List *allTasks = CreateTaskListForJobTree(topLevelTasks);
 
 	EnsureCompatibleLocalExecutionState(allTasks);
@@ -122,49 +118,4 @@ TraverseJobTree(Job *curJob, List **jobIds)
 	{
 		TraverseJobTree(childJob, jobIds);
 	}
-}
-
-
-/*
- * GenerateJobCommands returns concatenated commands with the given template
- * command for each job id from the given job ids. The returned command is
- * exactly list_length(jobIds) subcommands.
- *  E.g create_schema(jobId1); create_schema(jobId2); ...
- * This way we can send the command in just one latency to a worker.
- */
-static char *
-GenerateJobCommands(List *jobIds, char *templateCommand)
-{
-	StringInfo createSchemaCommand = makeStringInfo();
-
-	uint64 *jobIdPointer = NULL;
-	foreach_ptr(jobIdPointer, jobIds)
-	{
-		uint64 jobId = *jobIdPointer;
-		appendStringInfo(createSchemaCommand, templateCommand, jobId);
-	}
-	return createSchemaCommand->data;
-}
-
-
-/*
- * DoRepartitionCleanup removes the temporary job directories and schemas that are
- * used for repartition queries for the given job ids.
- */
-void
-DoRepartitionCleanup(List *jobIds)
-{
-	SendCommandToWorkersOptionalInParallel(ALL_SHARD_NODES, GenerateDeleteJobsCommand(
-											   jobIds),
-										   CitusExtensionOwnerName());
-}
-
-
-/*
- * GenerateDeleteJobsCommand returns concatanated remove job dir commands.
- */
-static char *
-GenerateDeleteJobsCommand(List *jobIds)
-{
-	return GenerateJobCommands(jobIds, WORKER_REPARTITION_CLEANUP_QUERY);
 }
