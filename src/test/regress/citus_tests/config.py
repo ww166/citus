@@ -19,6 +19,7 @@ ARBITRARY_SCHEDULE_NAMES = [
     "sql_schedule",
     "sql_base_schedule",
     "postgres_schedule",
+    "arbitrary_utils_schedule",
 ]
 
 BEFORE_PG_UPGRADE_SCHEDULE = "./before_pg_upgrade_schedule"
@@ -26,6 +27,7 @@ AFTER_PG_UPGRADE_SCHEDULE = "./after_pg_upgrade_schedule"
 
 CREATE_SCHEDULE = "./create_schedule"
 POSTGRES_SCHEDULE = "./postgres_schedule"
+ARBITRARY_UTILS_SCHEDULE = "./arbitrary_utils_schedule"
 SQL_SCHEDULE = "./sql_schedule"
 SQL_BASE_SCHEDULE = "./sql_base_schedule"
 
@@ -96,6 +98,7 @@ class CitusBaseClusterConfig(object, metaclass=NewInitCaller):
         self.pg_srcdir = arguments["--pgxsdir"]
         self.temp_dir = CITUS_ARBITRARY_TEST_DIR
         self.worker_amount = 2
+        self.create_user = None
         self.user = REGULAR_USER_NAME
         self.is_mx = False
         self.is_citus = True
@@ -121,6 +124,8 @@ class CitusBaseClusterConfig(object, metaclass=NewInitCaller):
         self.output_file = os.path.join(self.datadir, "run.out")
         if self.worker_amount > 0:
             self.chosen_random_worker_port = self.random_worker_port()
+        if self.create_user is None:
+            self.create_user = self.user
         self.settings.update(self.new_settings)
 
     def coordinator_port(self):
@@ -163,6 +168,11 @@ class CitusDefaultClusterConfig(CitusBaseClusterConfig):
         }
         self.settings.update(new_settings)
         self.add_coordinator_to_metadata = True
+
+class CitusGrantedPermissionsClusterConfig(CitusDefaultClusterConfig):
+    def __init__(self, arguments):
+        super().__init__(arguments)
+        self.create_user = SUPER_USER_NAME
 
 
 class CitusMXBaseClusterConfig(CitusDefaultClusterConfig):

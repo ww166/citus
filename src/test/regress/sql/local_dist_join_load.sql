@@ -1,5 +1,6 @@
 CREATE SCHEMA local_dist_join_mixed;
 SET search_path TO local_dist_join_mixed;
+SELECT grant_schema_to_regularuser('"local_dist_join_mixed"');
 
 
 
@@ -22,8 +23,11 @@ ALTER TABLE reference DROP column b;
 
 -- these above restrictions brought us to the following schema
 SELECT create_reference_table('reference');
+SELECT grant_table_to_regularuser('"local_dist_join_mixed"."reference"');
 SELECT create_distributed_table('distributed', 'id');
+SELECT grant_table_to_regularuser('"local_dist_join_mixed"."distributed"');
 SELECT citus_add_local_table_to_metadata('local');
+SELECT grant_table_to_regularuser('"local_dist_join_mixed"."local"');
 
 ALTER TABLE distributed DROP column b;
 ALTER TABLE reference DROP column a;

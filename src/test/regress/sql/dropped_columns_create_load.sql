@@ -1,9 +1,11 @@
 CREATE SCHEMA local_shard_execution_dropped_column;
 SET search_path TO local_shard_execution_dropped_column;
+SELECT grant_schema_to_regularuser('"local_shard_execution_dropped_column"');
 
 CREATE TABLE t1 (a int, b int, c int UNIQUE, d int, e int);
 ALTER TABLE t1 DROP COLUMN e;
 SELECT create_distributed_table('t1', 'c');
+SELECT grant_table_to_regularuser('"local_shard_execution_dropped_column"."t1"');
 ALTER TABLE t1 DROP COLUMN b;
 ALTER TABLE t1 DROP COLUMN d;
 
@@ -28,11 +30,14 @@ ALTER TABLE sensors DROP COLUMN col_to_drop_1;
 -- now attach the first partition and create the distributed table
 CREATE TABLE sensors_2000 PARTITION OF sensors FOR VALUES FROM ('2000-01-01') TO ('2001-01-01');
 SELECT create_distributed_table('sensors', 'measureid');
+SELECT grant_table_to_regularuser('"local_shard_execution_dropped_column"."sensors"');
+SELECT grant_table_to_regularuser('"local_shard_execution_dropped_column"."sensors_2000"');
 
 -- drop another column before attaching another partition
 -- with .. PARTITION OF .. syntax
 ALTER TABLE sensors DROP COLUMN col_to_drop_0;
 CREATE TABLE sensors_2001 PARTITION OF sensors FOR VALUES FROM ('2001-01-01') TO ('2002-01-01');
+SELECT grant_table_to_regularuser('"local_shard_execution_dropped_column"."sensors_2001"');
 
 -- drop another column before attaching another partition
 -- with ALTER TABLE .. ATTACH PARTITION
@@ -42,6 +47,7 @@ CREATE TABLE sensors_2002(
 col_to_drop_4 date, col_to_drop_3 inet, measureid integer, eventdatetime date, measure_data jsonb,
 PRIMARY KEY (measureid, eventdatetime, measure_data));
 ALTER TABLE sensors ATTACH PARTITION sensors_2002 FOR VALUES FROM ('2002-01-01') TO ('2003-01-01');
+SELECT grant_table_to_regularuser('"local_shard_execution_dropped_column"."sensors_2002"');
 
 -- drop another column before attaching another partition
 -- that is already distributed
@@ -52,7 +58,9 @@ col_to_drop_4 date, measureid integer, eventdatetime date, measure_data jsonb,
 PRIMARY KEY (measureid, eventdatetime, measure_data));
 
 SELECT create_distributed_table('sensors_2003', 'measureid');
+SELECT grant_table_to_regularuser('"local_shard_execution_dropped_column"."sensors_2003"');
 ALTER TABLE sensors ATTACH PARTITION sensors_2003 FOR VALUES FROM ('2003-01-01') TO ('2004-01-01');
+SELECT grant_table_to_regularuser('"local_shard_execution_dropped_column"."sensors_2003"');
 
 CREATE TABLE sensors_2004(
 col_to_drop_4 date, measureid integer NOT NULL, eventdatetime date NOT NULL, measure_data jsonb NOT NULL);
@@ -60,3 +68,4 @@ col_to_drop_4 date, measureid integer NOT NULL, eventdatetime date NOT NULL, mea
 ALTER TABLE sensors ATTACH PARTITION sensors_2004 FOR VALUES FROM ('2004-01-01') TO ('2005-01-01');
 ALTER TABLE sensors DROP COLUMN col_to_drop_4;
 SELECT alter_table_set_access_method('sensors_2004', 'columnar');
+SELECT grant_table_to_regularuser('"local_shard_execution_dropped_column"."sensors_2004"');

@@ -1,10 +1,22 @@
 CREATE SCHEMA "distributed planning";
 SET search_path TO "distributed planning";
+SELECT grant_schema_to_regularuser('"distributed planning"');
+ grant_schema_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE
 date_part_table (event_time timestamp, event int, user_id int)
 partition by range (event_time);
 SELECT create_distributed_table('date_part_table', 'user_id');
  create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"distributed planning"."date_part_table"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -31,10 +43,22 @@ SELECT create_distributed_table('test','x');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"distributed planning"."test"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TYPE new_type AS (n int, m text);
 CREATE TABLE test_2(x bigint, y bigint, z new_type);
 SELECT create_distributed_table('test_2','x');
  create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"distributed planning"."test_2"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -46,9 +70,21 @@ SELECT create_reference_table('ref');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"distributed planning"."ref"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE ref2(a bigint, b bigint);
 SELECT create_reference_table('ref2');
  create_reference_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"distributed planning"."ref2"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -60,9 +96,21 @@ select citus_add_local_table_to_metadata('local');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"distributed planning"."local"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE non_binary_copy_test (key int PRIMARY KEY, value new_type);
 SELECT create_distributed_table('non_binary_copy_test', 'key');
  create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"distributed planning"."non_binary_copy_test"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -82,6 +130,12 @@ SELECT create_distributed_table('upsert_test', 'part_key');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"distributed planning"."upsert_test"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 -- do a regular insert
 INSERT INTO upsert_test (part_key, other_col) VALUES (1, 1), (2, 2) RETURNING *;
  part_key | other_col | third_col
@@ -94,6 +148,12 @@ create table t1(a int, b int, c int primary key, d int);
 ALTER TABLE t1 DROP COLUMN b;
 select create_distributed_table('t1','c');
  create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"distributed planning"."t1"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -118,6 +178,12 @@ alter table companies drop column a;
 alter table companies drop column b;
 SELECT create_reference_table('companies');
  create_reference_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"distributed planning"."companies"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)

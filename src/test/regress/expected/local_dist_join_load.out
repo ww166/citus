@@ -1,5 +1,11 @@
 CREATE SCHEMA local_dist_join_mixed;
 SET search_path TO local_dist_join_mixed;
+SELECT grant_schema_to_regularuser('"local_dist_join_mixed"');
+ grant_schema_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE distributed (key int, id bigserial PRIMARY KEY,
                     	  name text,
                     	  created_at timestamptz DEFAULT now(), b int);
@@ -20,14 +26,32 @@ SELECT create_reference_table('reference');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"local_dist_join_mixed"."reference"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT create_distributed_table('distributed', 'id');
  create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"local_dist_join_mixed"."distributed"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT citus_add_local_table_to_metadata('local');
  citus_add_local_table_to_metadata
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"local_dist_join_mixed"."local"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)

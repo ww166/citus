@@ -1,11 +1,13 @@
 CREATE SCHEMA "distributed planning";
 SET search_path TO "distributed planning";
+SELECT grant_schema_to_regularuser('"distributed planning"');
 
 CREATE TABLE
 date_part_table (event_time timestamp, event int, user_id int)
 partition by range (event_time);
 
 SELECT create_distributed_table('date_part_table', 'user_id');
+SELECT grant_table_to_regularuser('"distributed planning"."date_part_table"');
 
 -- an unnamed index
 CREATE INDEX ON date_part_table(user_id, event_time);
@@ -22,22 +24,28 @@ INSERT INTO date_part_table
 
 CREATE TABLE test(x bigint, y bigint);
 SELECT create_distributed_table('test','x');
+SELECT grant_table_to_regularuser('"distributed planning"."test"');
 
 CREATE TYPE new_type AS (n int, m text);
 CREATE TABLE test_2(x bigint, y bigint, z new_type);
 SELECT create_distributed_table('test_2','x');
+SELECT grant_table_to_regularuser('"distributed planning"."test_2"');
 
 CREATE TABLE ref(a bigint, b bigint);
 SELECT create_reference_table('ref');
+SELECT grant_table_to_regularuser('"distributed planning"."ref"');
 
 CREATE TABLE ref2(a bigint, b bigint);
 SELECT create_reference_table('ref2');
+SELECT grant_table_to_regularuser('"distributed planning"."ref2"');
 
 CREATE TABLE local(c bigint, d bigint);
 select citus_add_local_table_to_metadata('local');
+SELECT grant_table_to_regularuser('"distributed planning"."local"');
 
 CREATE TABLE non_binary_copy_test (key int PRIMARY KEY, value new_type);
 SELECT create_distributed_table('non_binary_copy_test', 'key');
+SELECT grant_table_to_regularuser('"distributed planning"."non_binary_copy_test"');
 INSERT INTO non_binary_copy_test SELECT i, (i, 'citus9.5')::new_type FROM generate_series(0,1000)i;
 
 -- Test upsert with constraint
@@ -50,6 +58,7 @@ CREATE TABLE upsert_test
 
 -- distribute the table
 SELECT create_distributed_table('upsert_test', 'part_key');
+SELECT grant_table_to_regularuser('"distributed planning"."upsert_test"');
 
 -- do a regular insert
 INSERT INTO upsert_test (part_key, other_col) VALUES (1, 1), (2, 2) RETURNING *;
@@ -57,6 +66,7 @@ INSERT INTO upsert_test (part_key, other_col) VALUES (1, 1), (2, 2) RETURNING *;
 create table t1(a int, b int, c int primary key, d int);
 ALTER TABLE t1 DROP COLUMN b;
 select create_distributed_table('t1','c');
+SELECT grant_table_to_regularuser('"distributed planning"."t1"');
 ALTER TABLE t1 DROP COLUMN d;
 
 CREATE TABLE companies (
@@ -80,5 +90,6 @@ alter table companies drop column a;
 alter table companies drop column b;
 
 SELECT create_reference_table('companies');
+SELECT grant_table_to_regularuser('"distributed planning"."companies"');
 
 alter table companies drop column c;

@@ -1,5 +1,11 @@
 CREATE SCHEMA "ch benchmarks";
 SET search_path to "ch benchmarks";
+SELECT grant_schema_to_regularuser('"ch benchmarks"');
+ grant_schema_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE order_line (
     ol_w_id int NOT NULL,
     ol_d_id int NOT NULL,
@@ -148,8 +154,20 @@ SELECT create_distributed_table('order_line','ol_w_id');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"ch benchmarks"."order_line"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT create_distributed_table('new_order','no_w_id');
  create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"ch benchmarks"."new_order"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -160,8 +178,20 @@ SELECT create_distributed_table('stock','s_w_id');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"ch benchmarks"."stock"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT create_distributed_table('oorder','o_w_id');
  create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"ch benchmarks"."oorder"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -172,8 +202,20 @@ SELECT create_distributed_table('history','h_w_id');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"ch benchmarks"."history"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT create_distributed_table('customer','c_w_id');
  create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"ch benchmarks"."customer"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -184,8 +226,20 @@ SELECT create_distributed_table('district','d_w_id');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"ch benchmarks"."district"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT create_distributed_table('warehouse','w_id');
  create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"ch benchmarks"."warehouse"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -196,8 +250,20 @@ SELECT create_reference_table('item');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"ch benchmarks"."item"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT create_reference_table('region');
  create_reference_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"ch benchmarks"."region"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -208,8 +274,20 @@ SELECT create_reference_table('nation');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"ch benchmarks"."nation"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT create_reference_table('supplier');
  create_reference_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"ch benchmarks"."supplier"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)

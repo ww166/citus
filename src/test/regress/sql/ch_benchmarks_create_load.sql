@@ -1,5 +1,6 @@
 CREATE SCHEMA "ch benchmarks";
 SET search_path to "ch benchmarks";
+SELECT grant_schema_to_regularuser('"ch benchmarks"');
 
 
 CREATE TABLE order_line (
@@ -146,17 +147,29 @@ CREATE TABLE supplier (
 );
 
 SELECT create_distributed_table('order_line','ol_w_id');
+SELECT grant_table_to_regularuser('"ch benchmarks"."order_line"');
 SELECT create_distributed_table('new_order','no_w_id');
+SELECT grant_table_to_regularuser('"ch benchmarks"."new_order"');
 SELECT create_distributed_table('stock','s_w_id');
+SELECT grant_table_to_regularuser('"ch benchmarks"."stock"');
 SELECT create_distributed_table('oorder','o_w_id');
+SELECT grant_table_to_regularuser('"ch benchmarks"."oorder"');
 SELECT create_distributed_table('history','h_w_id');
+SELECT grant_table_to_regularuser('"ch benchmarks"."history"');
 SELECT create_distributed_table('customer','c_w_id');
+SELECT grant_table_to_regularuser('"ch benchmarks"."customer"');
 SELECT create_distributed_table('district','d_w_id');
+SELECT grant_table_to_regularuser('"ch benchmarks"."district"');
 SELECT create_distributed_table('warehouse','w_id');
+SELECT grant_table_to_regularuser('"ch benchmarks"."warehouse"');
 SELECT create_reference_table('item');
+SELECT grant_table_to_regularuser('"ch benchmarks"."item"');
 SELECT create_reference_table('region');
+SELECT grant_table_to_regularuser('"ch benchmarks"."region"');
 SELECT create_reference_table('nation');
+SELECT grant_table_to_regularuser('"ch benchmarks"."nation"');
 SELECT create_reference_table('supplier');
+SELECT grant_table_to_regularuser('"ch benchmarks"."supplier"');
 
 TRUNCATE order_line, new_order, stock, oorder, history, customer, district, warehouse, item, region, nation, supplier; -- for easy copy in development
 INSERT INTO supplier SELECT c, 'abc', 'def', c, 'ghi', c, 'jkl' FROM generate_series(0,10) AS c;

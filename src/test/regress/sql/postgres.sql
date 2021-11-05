@@ -27,3 +27,34 @@ AS $function$
 BEGIN
 END;
 $function$;
+
+
+CREATE OR REPLACE FUNCTION pg_catalog.run_command_on_workers(command text,
+													parallel bool default true,
+													OUT nodename text,
+													OUT nodeport int,
+													OUT success bool,
+													OUT result text)
+	RETURNS SETOF record
+	LANGUAGE plpgsql
+
+AS $function$
+BEGIN
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION pg_catalog.run_command_on_placements(table_name regclass,
+																command text,
+																parallel bool default true,
+																OUT nodename text,
+																OUT nodeport int,
+																OUT shardid bigint,
+																OUT success bool,
+																OUT result text)
+	RETURNS SETOF record
+	LANGUAGE plpgsql
+
+AS $function$
+BEGIN
+END;
+$function$;

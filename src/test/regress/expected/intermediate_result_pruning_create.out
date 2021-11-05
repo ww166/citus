@@ -1,8 +1,20 @@
 CREATE SCHEMA "intermediate result pruning";
 SET search_path TO "intermediate result pruning";
+SELECT grant_schema_to_regularuser('"intermediate result pruning"');
+ grant_schema_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE table_1 (key int, value text);
 SELECT create_distributed_table('table_1', 'key');
  create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"intermediate result pruning"."table_1"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -14,6 +26,12 @@ SELECT create_distributed_table('table_2', 'key');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"intermediate result pruning"."table_2"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE table_3 (key int, value text);
 SELECT create_distributed_table('table_3', 'key');
  create_distributed_table
@@ -21,9 +39,21 @@ SELECT create_distributed_table('table_3', 'key');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"intermediate result pruning"."table_3"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE ref_table (key int, value text);
 SELECT create_reference_table('ref_table');
  create_reference_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"intermediate result pruning"."ref_table"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
@@ -41,8 +71,20 @@ SELECT create_distributed_table('accounts', 'id', colocate_with => 'none');
 
 (1 row)
 
+SELECT grant_table_to_regularuser('"intermediate result pruning"."accounts"');
+ grant_table_to_regularuser
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT create_distributed_table('stats', 'account_id', colocate_with => 'accounts');
  create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT grant_table_to_regularuser('"intermediate result pruning"."stats"');
+ grant_table_to_regularuser
 ---------------------------------------------------------------------
 
 (1 row)
