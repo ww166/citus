@@ -35,12 +35,12 @@ FROM
 
 -- make sure that granting produce the same output for both community and enterprise
 SET client_min_messages TO ERROR;
-GRANT ALL ON SCHEMA "Mx Super User" TO regular_mx_user;
-GRANT ALL ON TABLE super_user_owned_regular_user_granted TO regular_mx_user;
+GRANT USAGE ON SCHEMA "Mx Super User" TO regular_mx_user;
+GRANT INSERT ON TABLE super_user_owned_regular_user_granted TO regular_mx_user;
 
-SELECT 1 FROM run_command_on_workers($$GRANT ALL ON SCHEMA "Mx Super User" TO regular_mx_user;$$);
-SELECT 1 FROM run_command_on_workers($$GRANT ALL ON TABLE "Mx Super User".super_user_owned_regular_user_granted TO regular_mx_user;$$);
-SELECT 1 FROM run_command_on_placements('super_user_owned_regular_user_granted', $$GRANT ALL ON TABLE %s TO regular_mx_user;$$);
+SELECT 1 FROM run_command_on_workers($$GRANT USAGE ON SCHEMA "Mx Super User" TO regular_mx_user;$$);
+SELECT 1 FROM run_command_on_workers($$GRANT INSERT ON TABLE "Mx Super User".super_user_owned_regular_user_granted TO regular_mx_user;$$);
+SELECT 1 FROM run_command_on_placements('super_user_owned_regular_user_granted', $$GRANT INSERT ON TABLE %s TO regular_mx_user;$$);
 
 -- now that the GRANT is given, the regular user should be able to
 -- modify the table
@@ -50,7 +50,6 @@ COPY super_user_owned_regular_user_granted FROM STDIN;
 1
 2
 \.
-SELECT count(*) FROM super_user_owned_regular_user_granted;
 
 \c - postgres - :master_port;
 SET client_min_messages TO ERROR;
