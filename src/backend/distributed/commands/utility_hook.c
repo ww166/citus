@@ -66,6 +66,7 @@
 #include "distributed/resource_lock.h"
 #include "distributed/transmit.h"
 #include "distributed/version_compat.h"
+#include "distributed/worker_shard_visibility.h"
 #include "distributed/worker_transaction.h"
 #include "foreign/foreign.h"
 #include "lib/stringinfo.h"
@@ -422,6 +423,16 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 		if (IsMultiStatementTransaction() && ShouldPropagateSetCommand(setStmt))
 		{
 			PostprocessVariableSetStmt(setStmt, queryString);
+		}
+
+		if (setStmt->name != NULL &&
+			pg_strcasecmp(setStmt->name, "application_name") == 0)
+		{
+			/*
+			 * If the user changes the application_name, we may need to start
+			 * hiding/showing shards.
+			 */
+			ResetHideShardsDecision();
 		}
 	}
 
