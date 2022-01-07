@@ -31,15 +31,16 @@ SELECT create_distributed_table('test_table', 'id');
 
 -- first show that the views does not show
 -- any shards on the coordinator as expected
-SELECT * FROM citus_shards_on_worker;
-SELECT * FROM citus_shard_indexes_on_worker;
+SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names';
+SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names';
 
 -- now show that we see the shards, but not the
 -- indexes as there are no indexes
 \c - - - :worker_1_port
+\c postgresql://postgres@localhost::worker_1_port/regression?application_name=psql
 SET search_path TO 'mx_hide_shard_names';
-SELECT * FROM citus_shards_on_worker ORDER BY 2;
-SELECT * FROM citus_shard_indexes_on_worker ORDER BY 2;
+SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
+SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
 
 -- also show that nested calls to pg_table_is_visible works fine
 -- if both of the calls to the pg_table_is_visible haven't been
@@ -63,8 +64,8 @@ CREATE INDEX test_index ON mx_hide_shard_names.test_table(id);
 -- indexes as well
 \c - - - :worker_1_port
 SET search_path TO 'mx_hide_shard_names';
-SELECT * FROM citus_shards_on_worker ORDER BY 2;
-SELECT * FROM citus_shard_indexes_on_worker ORDER BY 2;
+SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
+SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
 
 -- we should be able to select from the shards directly if we
 -- know the name of the tables
@@ -95,7 +96,7 @@ SET search_path TO 'mx_hide_shard_names';
 -- name already exists :)
 CREATE TABLE test_table_2_1130000(id int, time date);
 
-SELECT * FROM citus_shards_on_worker ORDER BY 2;
+SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
 
 \d
 
@@ -111,14 +112,14 @@ CREATE INDEX test_index ON mx_hide_shard_names_2.test_table(id);
 
 \c - - - :worker_1_port
 SET search_path TO 'mx_hide_shard_names';
-SELECT * FROM citus_shards_on_worker ORDER BY 2;
-SELECT * FROM citus_shard_indexes_on_worker ORDER BY 2;
+SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
+SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
 SET search_path TO 'mx_hide_shard_names_2';
-SELECT * FROM citus_shards_on_worker ORDER BY 2;
-SELECT * FROM citus_shard_indexes_on_worker ORDER BY 2;
+SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
+SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
 SET search_path TO 'mx_hide_shard_names_2, mx_hide_shard_names';
-SELECT * FROM citus_shards_on_worker ORDER BY 2;
-SELECT * FROM citus_shard_indexes_on_worker ORDER BY 2;
+SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names_2' ORDER BY 2;
+SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names_2' ORDER BY 2;
 
 -- now try very long table names
 \c - - - :master_port
@@ -137,7 +138,7 @@ SELECT create_distributed_table('too_long_12345678901234567890123456789012345678
 
 \c - - - :worker_1_port
 SET search_path TO 'mx_hide_shard_names_3';
-SELECT * FROM citus_shards_on_worker ORDER BY 2;
+SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names_3' ORDER BY 2;
 \d
 
 
@@ -159,8 +160,8 @@ SELECT create_distributed_table('"CiTuS.TeeN"."TeeNTabLE.1!?!"', 'TeNANt_Id');
 
 \c - - - :worker_1_port
 SET search_path TO "CiTuS.TeeN";
-SELECT * FROM citus_shards_on_worker ORDER BY 2;
-SELECT * FROM citus_shard_indexes_on_worker ORDER BY 2;
+SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'CiTuS.TeeN' ORDER BY 2;
+SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'CiTuS.TeeN' ORDER BY 2;
 
 \d
 \di
