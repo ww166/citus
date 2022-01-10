@@ -42,19 +42,6 @@ SET search_path TO 'mx_hide_shard_names';
 SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
 SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
 
--- also show that nested calls to pg_table_is_visible works fine
--- if both of the calls to the pg_table_is_visible haven't been
--- replaced, we would get 0 rows in the output
-SELECT
-	pg_table_is_visible((SELECT
-								"t1"."Name"::regclass
-						 FROM
-						 	citus_shards_on_worker as t1
-						 WHERE
-						 	NOT pg_table_is_visible("t1"."Name"::regclass)
-						 LIMIT
-						 	1));
-
 -- now create an index
 \c - - - :master_port
 SET search_path TO 'mx_hide_shard_names';
@@ -71,10 +58,11 @@ SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_name
 -- know the name of the tables
 SELECT count(*) FROM test_table_1130000;
 
--- disable the config so that table becomes visible
+-- shards on the search_path still match pg_table_is_visible
 SELECT pg_table_is_visible('test_table_1130000'::regclass);
-SET citus.override_table_visibility TO FALSE;
-SELECT pg_table_is_visible('test_table_1130000'::regclass);
+
+-- shards on the search_path do not match citus_table_is_visible
+SELECT citus_table_is_visible('test_table_1130000'::regclass);
 
 \c - - - :master_port
 -- make sure that we're resilient to the edge cases
@@ -114,10 +102,6 @@ CREATE INDEX test_index ON mx_hide_shard_names_2.test_table(id);
 SET search_path TO 'mx_hide_shard_names';
 SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
 SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
-SET search_path TO 'mx_hide_shard_names_2';
-SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
-SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
-SET search_path TO 'mx_hide_shard_names_2, mx_hide_shard_names';
 SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names_2' ORDER BY 2;
 SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names_2' ORDER BY 2;
 
