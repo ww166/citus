@@ -341,8 +341,24 @@ ResetHideShardsDecisionAtXactEnd(void)
 
 
 /*
+ * AfterSubxactResetHideShards is called at the end of a subtransaction to signal
+ * that we should reset the hide shards decision. The reason is that the
+ * application_name might be reset.
+ */
+void
+AfterSubxactResetHideShards(void)
+{
+	if (ResetAtXactEnd)
+	{
+		ResetHideShardsDecision();
+	}
+}
+
+
+/*
  * AfterXactResetHideShards is called at the end of the transaction to signal
- * that we should reset the transaction decision.
+ * that we should reset the hide shards decision. The reason is that the
+ * application_name might be reset.
  */
 void
 AfterXactResetHideShards(void)
@@ -350,6 +366,7 @@ AfterXactResetHideShards(void)
 	if (ResetAtXactEnd)
 	{
 		ResetHideShardsDecision();
+		ResetAtXactEnd = false;
 	}
 }
 

@@ -60,6 +60,14 @@ SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_name
 SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
 
 -- changing application_name reveals the shards
+SET application_name TO '';
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
+RESET application_name;
+
+-- shards are hidden again after GUCs are reset
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
+
+-- changing application_name in transaction reveals the shards
 BEGIN;
 SET LOCAL application_name TO '';
 SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
@@ -67,6 +75,25 @@ ROLLBACK;
 
 -- shards are hidden again after GUCs are reset
 SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
+
+-- now with session-level GUC, but ROLLBACK;
+BEGIN;
+SET application_name TO '';
+ROLLBACK;
+
+-- shards are hidden again after GUCs are reset
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
+
+-- we should hide correctly based on application_name with savepoints
+BEGIN;
+SAVEPOINT s1;
+SET application_name TO '';
+-- changing application_name reveals the shards
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
+ROLLBACK TO SAVEPOINT s1;
+-- shards are hidden again after GUCs are reset
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
+ROLLBACK;
 
 -- changing citus.hide_shards_from_app_name_prefixes reveals the shards
 BEGIN;

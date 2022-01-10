@@ -595,6 +595,9 @@ CoordinatedSubTransactionCallback(SubXactEvent event, SubTransactionId subId,
 				CoordinatedRemoteTransactionsSavepointRelease(subId);
 			}
 			PopSubXact(subId);
+
+			/* application_name might change */
+			AfterXactResetHideShards();
 			break;
 		}
 
@@ -617,6 +620,8 @@ CoordinatedSubTransactionCallback(SubXactEvent event, SubTransactionId subId,
 			}
 			PopSubXact(subId);
 
+			/* application_name might change */
+			AfterXactResetHideShards();
 			break;
 		}
 
