@@ -36,11 +36,13 @@ SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_name
 
 -- now show that we see the shards, but not the
 -- indexes as there are no indexes
-\c - - - :worker_1_port
 \c postgresql://postgres@localhost::worker_1_port/regression?application_name=psql
 SET search_path TO 'mx_hide_shard_names';
 SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
 SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
+
+-- shards are hidden when using psql as application_name
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
 
 -- now create an index
 \c - - - :master_port
@@ -49,10 +51,28 @@ CREATE INDEX test_index ON mx_hide_shard_names.test_table(id);
 
 -- now show that we see the shards, and the
 -- indexes as well
-\c - - - :worker_1_port
+\c postgresql://postgres@localhost::worker_1_port/regression?application_name=psql
 SET search_path TO 'mx_hide_shard_names';
 SELECT * FROM citus_shards_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
 SELECT * FROM citus_shard_indexes_on_worker WHERE "Schema" = 'mx_hide_shard_names' ORDER BY 2;
+
+-- shards are hidden when using psql as application_name
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
+
+-- changing application_name reveals the shards
+BEGIN;
+SET LOCAL application_name TO '';
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
+ROLLBACK;
+
+-- changing citus.hide_shards_from_app_name_prefixes reveals the shards
+BEGIN;
+SET LOCAL citus.hide_shards_from_app_name_prefixes TO 'notpsql';
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
+ROLLBACK;
+
+-- shards are hidden again after GUCs are reset
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
 
 -- we should be able to select from the shards directly if we
 -- know the name of the tables
