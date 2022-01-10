@@ -65,6 +65,9 @@ SET LOCAL application_name TO '';
 SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
 ROLLBACK;
 
+-- shards are hidden again after GUCs are reset
+SELECT relname FROM pg_catalog.pg_class WHERE relnamespace = 'mx_hide_shard_names'::regnamespace ORDER BY relname;
+
 -- changing citus.hide_shards_from_app_name_prefixes reveals the shards
 BEGIN;
 SET LOCAL citus.hide_shards_from_app_name_prefixes TO 'notpsql';

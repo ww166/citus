@@ -39,6 +39,7 @@
 #include "distributed/subplan_execution.h"
 #include "distributed/version_compat.h"
 #include "distributed/worker_log_messages.h"
+#include "distributed/worker_shard_visibility.h"
 #include "utils/hsearch.h"
 #include "utils/guc.h"
 #include "utils/memutils.h"
@@ -553,6 +554,7 @@ ResetGlobalVariables()
 	MetadataSyncOnCommit = false;
 	InDelegatedFunctionCall = false;
 	ResetWorkerErrorIndication();
+	AfterXactResetHideShards();
 }
 
 

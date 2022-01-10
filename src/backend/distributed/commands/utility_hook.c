@@ -433,6 +433,13 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 			 * hiding/showing shards.
 			 */
 			ResetHideShardsDecision();
+
+			/*
+			 * In case of a temporary assignment (e.g. SET LOCAL), the value
+			 * may change back at the end of the transaction. Therefore we
+			 * need to always reset our cache at transaction end.
+			 */
+			ResetHideShardsDecisionAtXactEnd();
 		}
 	}
 
