@@ -619,12 +619,13 @@ SELECT create_distributed_table('table_test_prepare', 'i', colocate_with := 'non
 
 DROP FUNCTION test_prepare(int, int);
 CREATE OR REPLACE FUNCTION test_prepare(x int, y int)
-RETURNS void
+RETURNS bigint
 AS $$
 DECLARE
 BEGIN
     INSERT INTO forcepushdown_schema.table_test_prepare VALUES (x, y);
     INSERT INTO forcepushdown_schema.table_test_prepare VALUES (y, x);
+	RETURN x + y;
 END;
 $$ LANGUAGE plpgsql;
 SELECT create_distributed_function('test_prepare(int,int)','x',force_delegation :=true, colocate_with := 'table_test_prepare');
@@ -637,7 +638,7 @@ DECLARE
     v int;
 BEGIN
     PERFORM FROM test_prepare(x, y);
-    PERFORM FROM test_prepare(y, x);
+    PERFORM 1, 1 + a FROM test_prepare(x + 1, y + 1) a;
 END;
 $$ LANGUAGE plpgsql;
 

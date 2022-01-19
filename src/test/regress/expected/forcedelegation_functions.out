@@ -1201,12 +1201,13 @@ SELECT create_distributed_table('table_test_prepare', 'i', colocate_with := 'non
 DROP FUNCTION test_prepare(int, int);
 ERROR:  function test_prepare(integer, integer) does not exist
 CREATE OR REPLACE FUNCTION test_prepare(x int, y int)
-RETURNS void
+RETURNS bigint
 AS $$
 DECLARE
 BEGIN
     INSERT INTO forcepushdown_schema.table_test_prepare VALUES (x, y);
     INSERT INTO forcepushdown_schema.table_test_prepare VALUES (y, x);
+	RETURN x + y;
 END;
 $$ LANGUAGE plpgsql;
 SELECT create_distributed_function('test_prepare(int,int)','x',force_delegation :=true, colocate_with := 'table_test_prepare');
@@ -1226,7 +1227,7 @@ DECLARE
     v int;
 BEGIN
     PERFORM FROM test_prepare(x, y);
-    PERFORM FROM test_prepare(y, x);
+    PERFORM 1, 1 + a FROM test_prepare(x + 1, y + 1) a;
 END;
 $$ LANGUAGE plpgsql;
 -- First 5 get delegated and succeeds
@@ -1239,10 +1240,10 @@ DEBUG:  pushing down the function call
 CONTEXT:  SQL statement "SELECT FROM test_prepare(x, y)"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down function call in a multi-statement transaction
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down the function call
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
  outer_test_prepare
 ---------------------------------------------------------------------
@@ -1257,10 +1258,10 @@ DEBUG:  pushing down the function call
 CONTEXT:  SQL statement "SELECT FROM test_prepare(x, y)"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down function call in a multi-statement transaction
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down the function call
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
  outer_test_prepare
 ---------------------------------------------------------------------
@@ -1275,10 +1276,10 @@ DEBUG:  pushing down the function call
 CONTEXT:  SQL statement "SELECT FROM test_prepare(x, y)"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down function call in a multi-statement transaction
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down the function call
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
  outer_test_prepare
 ---------------------------------------------------------------------
@@ -1293,10 +1294,10 @@ DEBUG:  pushing down the function call
 CONTEXT:  SQL statement "SELECT FROM test_prepare(x, y)"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down function call in a multi-statement transaction
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down the function call
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
  outer_test_prepare
 ---------------------------------------------------------------------
@@ -1311,10 +1312,10 @@ DEBUG:  pushing down the function call
 CONTEXT:  SQL statement "SELECT FROM test_prepare(x, y)"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down function call in a multi-statement transaction
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down the function call
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
  outer_test_prepare
 ---------------------------------------------------------------------
@@ -1337,10 +1338,10 @@ DEBUG:  pushing down the function call
 CONTEXT:  SQL statement "SELECT FROM test_prepare(x, y)"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down function call in a multi-statement transaction
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down the function call
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
  outer_test_prepare
 ---------------------------------------------------------------------
@@ -1355,10 +1356,10 @@ DEBUG:  pushing down the function call
 CONTEXT:  SQL statement "SELECT FROM test_prepare(x, y)"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down function call in a multi-statement transaction
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
 DEBUG:  pushing down the function call
-CONTEXT:  SQL statement "SELECT FROM test_prepare(y, x)"
+CONTEXT:  SQL statement "SELECT 1, 1 + a FROM test_prepare(x + 1, y + 1) a"
 PL/pgSQL function outer_test_prepare(integer,integer) line XX at PERFORM
  outer_test_prepare
 ---------------------------------------------------------------------

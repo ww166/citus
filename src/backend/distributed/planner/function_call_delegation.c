@@ -92,13 +92,12 @@ contain_param_walker(Node *node, void *context)
 
 		pwcontext->hasParam = true;
 		pwcontext->paramKind = paramNode->paramkind;
-		if (paramNode->paramkind == PARAM_EXEC)
-		{
-			return true;
-		}
+		return paramNode->paramkind == PARAM_EXEC;
 	}
-
-	return false;
+	else
+	{
+		return expression_tree_walker((Node *) node, contain_param_walker, context);
+	}
 }
 
 
@@ -259,14 +258,14 @@ TryToDelegateFunctionCall(DistributedPlanningContext *planContext)
 
 	if (IsCitusInitiatedRemoteBackend())
 	{
-		bool isFunctionForceDelagated = procedure->forceDelegation;
+		bool isFunctionForceDelegated = procedure->forceDelegation;
 
 		/*
 		 * We are planning a call to a distributed function within a Citus backend,
 		 * that means that this is the delegated call. If the function is forcefully
 		 * delegated, capture the distribution argument.
 		 */
-		if (isFunctionForceDelagated)
+		if (isFunctionForceDelegated)
 		{
 			CheckDelegatedFunctionExecution(procedure, funcExpr);
 		}
@@ -278,7 +277,7 @@ TryToDelegateFunctionCall(DistributedPlanningContext *planContext)
 			 * InTopLevelDelegatedFunctionCall flag grants the levy
 			 * to do remote tasks from a delegated function.
 			 */
-			if (!isFunctionForceDelagated)
+			if (!isFunctionForceDelegated)
 			{
 				/*
 				 * we are planning a regular delegated call, we
