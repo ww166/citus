@@ -85,7 +85,6 @@ static ObjectAddress FunctionToObjectAddress(ObjectType objectType,
 											 ObjectWithArgs *objectWithArgs,
 											 bool missing_ok);
 static void ErrorIfUnsupportedAlterFunctionStmt(AlterFunctionStmt *stmt);
-static void ErrorIfFunctionDependsOnExtension(const ObjectAddress *functionAddress);
 static char * quote_qualified_func_name(Oid funcOid);
 static void DistributeFunctionWithDistributionArgument(RegProcedure funcOid,
 													   char *distributionArgumentName,
@@ -187,22 +186,25 @@ create_distributed_function(PG_FUNCTION_ARGS)
 	EnsureFunctionOwner(funcOid);
 
 	ObjectAddressSet(functionAddress, ProcedureRelationId, funcOid);
-	ErrorIfFunctionDependsOnExtension(&functionAddress);
 
-	/*
-	 * when we allow propagation within a transaction block we should make sure to only
-	 * allow this in sequential mode
-	 */
-	EnsureSequentialModeForFunctionDDL();
+	ObjectAddress extensionAddress = { 0 };
 
-	EnsureDependenciesExistOnAllNodes(&functionAddress);
+	if (!IsObjectAddressOwnedByExtension(&functionAddress, &extensionAddress))
+	{
+		/*
+		 * when we allow propagation within a transaction block we should make sure to only
+		 * allow this in sequential mode
+		 */
+		EnsureSequentialModeForFunctionDDL();
+		EnsureDependenciesExistOnAllNodes(&functionAddress);
 
-	const char *createFunctionSQL = GetFunctionDDLCommand(funcOid, true);
-	const char *alterFunctionOwnerSQL = GetFunctionAlterOwnerCommand(funcOid);
-	initStringInfo(&ddlCommand);
-	appendStringInfo(&ddlCommand, "%s;%s;%s;%s", DISABLE_OBJECT_PROPAGATION,
-					 createFunctionSQL, alterFunctionOwnerSQL, ENABLE_OBJECT_PROPAGATION);
-	SendCommandToWorkersAsUser(NON_COORDINATOR_NODES, CurrentUserName(), ddlCommand.data);
+		const char *createFunctionSQL = GetFunctionDDLCommand(funcOid, true);
+		const char *alterFunctionOwnerSQL = GetFunctionAlterOwnerCommand(funcOid);
+		initStringInfo(&ddlCommand);
+		appendStringInfo(&ddlCommand, "%s;%s;%s;%s", DISABLE_OBJECT_PROPAGATION,
+						 createFunctionSQL, alterFunctionOwnerSQL, ENABLE_OBJECT_PROPAGATION);
+		SendCommandToWorkersAsUser(NON_COORDINATOR_NODES, CurrentUserName(), ddlCommand.data);
+	}
 
 	MarkObjectDistributed(&functionAddress);
 
@@ -2009,33 +2011,6 @@ ErrorIfUnsupportedAlterFunctionStmt(AlterFunctionStmt *stmt)
 										"TO ... syntax with a constant value.")));
 			}
 		}
-	}
-}
-
-
-/*
- * ErrorIfFunctionDependsOnExtension functions depending on extensions should raise an
- * error informing the user why they can't be distributed.
- */
-static void
-ErrorIfFunctionDependsOnExtension(const ObjectAddress *functionAddress)
-{
-	/* captures the extension address during lookup */
-	ObjectAddress extensionAddress = { 0 };
-
-	if (IsObjectAddressOwnedByExtension(functionAddress, &extensionAddress))
-	{
-		char *functionName =
-			getObjectIdentity_compat(functionAddress, /* missingOk: */ false);
-		char *extensionName =
-			getObjectIdentity_compat(&extensionAddress, /* missingOk: */ false);
-		ereport(ERROR, (errmsg("unable to create a distributed function from functions "
-							   "owned by an extension"),
-						errdetail("Function \"%s\" has a dependency on extension \"%s\". "
-								  "Functions depending on an extension cannot be "
-								  "distributed. Create the function by creating the "
-								  "extension on the workers.", functionName,
-								  extensionName)));
 	}
 }
 
