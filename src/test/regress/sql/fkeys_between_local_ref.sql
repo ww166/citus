@@ -106,6 +106,19 @@ ROLLBACK;
 ALTER TABLE local_table_1 ADD COLUMN col_3 INT REFERENCES reference_table_1(col_1);
 
 BEGIN;
+  CREATE VIEW view_1 AS
+  SELECT col_1 AS "weird\'col_1", col_1+col_1 AS col_1_plus_col_1
+  FROM local_table_2;
+
+  CREATE MATERIALIZED VIEW mat_view_1 AS
+  SELECT local_table_4.col_1, local_table_3.col_1 + view_1.col_1_plus_col_1
+  FROM local_table_4, local_table_3, view_1;
+
+  CREATE TABLE another_table (int_col int, text_col int);
+  CREATE VIEW view_2 AS
+  SELECT *
+  FROM mat_view_1, view_1, another_table;
+
   -- define a foreign key so that all 4 local tables become citus local tables
   ALTER TABLE local_table_1 ADD CONSTRAINT fkey_11 FOREIGN KEY (col_1) REFERENCES reference_table_1(col_1);
 

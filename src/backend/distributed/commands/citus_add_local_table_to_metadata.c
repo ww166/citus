@@ -33,11 +33,13 @@
 #include "distributed/listutils.h"
 #include "distributed/local_executor.h"
 #include "distributed/metadata_sync.h"
+#include "distributed/metadata/dependency.h"
 #include "distributed/multi_partitioning_utils.h"
 #include "distributed/namespace_utils.h"
 #include "distributed/reference_table_utils.h"
 #include "distributed/worker_protocol.h"
 #include "distributed/worker_shard_visibility.h"
+#include "executor/spi.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
@@ -51,6 +53,8 @@ static void ErrorIfUnsupportedCreateCitusLocalTable(Relation relation);
 static void ErrorIfUnsupportedCitusLocalTableKind(Oid relationId);
 static void ErrorIfUnsupportedCitusLocalColumnDefinition(Relation relation);
 static List * GetShellTableDDLEventsForCitusLocalTable(Oid relationId);
+static void DropDependingViews(Oid relationId);
+static char * GetDropViewCommand(Oid viewId);
 static uint64 ConvertLocalTableToShard(Oid relationId);
 static void RenameRelationToShardRelation(Oid shellRelationId, uint64 shardId);
 static void RenameShardRelationConstraints(Oid shardRelationId, uint64 shardId);
@@ -71,6 +75,7 @@ static char * GetDropTriggerCommand(Oid relationId, char *triggerName);
 static List * GetRenameStatsCommandList(List *statsOidList, uint64 shardId);
 static void DropDefaultExpressionsAndMoveOwnedSequenceOwnerships(Oid sourceRelationId,
 																 Oid targetRelationId);
+static void ExecuteTableDDLCommandListViaSPIUtility(List *tableDDLCommandList);
 static void DropDefaultColumnDefinition(Oid relationId, char *columnName);
 static void TransferSequenceOwnership(Oid ownedSequenceId, Oid targetRelationId,
 									  char *columnName);
@@ -282,6 +287,19 @@ CreateCitusLocalTable(Oid relationId, bool cascadeViaForeignKeys)
 
 	List *shellTableDDLEvents = GetShellTableDDLEventsForCitusLocalTable(relationId);
 
+	/*
+	 * We drop & re-create views so they point to shell relation. For this
+	 * reason, here we store view creation commands before dropping them.
+	 * Note that we cannot execute view creation commands together with
+	 * shell table DDL events as ExecuteAndLogUtilityCommandList doesn't
+	 * know how to handle such commands due to the "Query *" part in those
+	 * view creation commands.
+	 */
+	List *viewCreationCommandsOfTable = GetViewCreationCommandsOfTable(relationId);
+
+	/* drop all views after getting creation commands */
+	DropDependingViews(relationId);
+
 	char *relationName = get_rel_name(relationId);
 	Oid relationSchemaId = get_rel_namespace(relationId);
 
@@ -294,6 +312,9 @@ CreateCitusLocalTable(Oid relationId, bool cascadeViaForeignKeys)
 	 * via process utility.
 	 */
 	ExecuteAndLogUtilityCommandList(shellTableDDLEvents);
+
+	/* re-create views via SPI utility */
+	ExecuteTableDDLCommandListViaSPIUtility(viewCreationCommandsOfTable);
 
 	/*
 	 * Set shellRelationId as the relation with relationId now points
@@ -465,6 +486,50 @@ GetShellTableDDLEventsForCitusLocalTable(Oid relationId)
 	shellTableDDLEvents = list_concat(shellTableDDLEvents, foreignConstraintCommands);
 
 	return shellTableDDLEvents;
+}
+
+
+/*
+ * DropDependingViews drops views depending on view.
+ */
+static void
+DropDependingViews(Oid relationId)
+{
+	/*
+	 * GetDependingViews returns dependencies in topological order.
+	 * So we should start dropping views in the reverse order.
+	 */
+	List *dependingViews = GetDependingViews(relationId);
+	while (list_length(dependingViews) > 0)
+	{
+		Oid viewId = llast_oid(dependingViews);
+		char *dropViewCascadeCommand = GetDropViewCommand(viewId);
+		ExecuteAndLogUtilityCommand(dropViewCascadeCommand);
+
+		int listSize = list_length(dependingViews);
+		dependingViews = list_truncate(dependingViews, listSize - 1);
+	}
+}
+
+
+/*
+ * GetDropViewCommand returns DDL command to drop view with viewId.
+ */
+static char *
+GetDropViewCommand(Oid viewId)
+{
+	char *viewName = get_rel_name(viewId);
+	Oid viewSchemaId = get_rel_namespace(viewId);
+	char *viewSchemaName = get_namespace_name(viewSchemaId);
+	char *qualifiedViewName = quote_qualified_identifier(viewSchemaName, viewName);
+
+	bool isMatView = get_rel_relkind(viewId) == RELKIND_MATVIEW;
+	StringInfo dropViewCascadeCommand = makeStringInfo();
+	appendStringInfo(dropViewCascadeCommand, "DROP %s VIEW %s;",
+					 isMatView ? "MATERIALIZED" : "",
+					 qualifiedViewName);
+
+	return dropViewCascadeCommand->data;
 }
 
 
@@ -910,6 +975,24 @@ GetRenameStatsCommandList(List *statsOidList, uint64 shardId)
 
 
 /*
+ * ExecuteTableDDLCommandListViaSPIUtility takes a list of TableDDLCommand
+ * objects and executes them vis SPI utility.
+ */
+static void
+ExecuteTableDDLCommandListViaSPIUtility(List *tableDDLCommandList)
+{
+	TableDDLCommand *tableDDLCommand = NULL;
+	foreach_ptr(tableDDLCommand, tableDDLCommandList)
+	{
+		char *commandString = GetTableDDLCommand(tableDDLCommand);
+
+		ereport(DEBUG4, (errmsg("executing \"%s\"", commandString)));
+		ExecuteQueryViaSPI(commandString, SPI_OK_UTILITY);
+	}
+}
+
+
+/* 
  * DropDefaultExpressionsAndMoveOwnedSequenceOwnerships drops default column
  * definitions for relation with sourceRelationId. Also, for each column that
  * defaults to an owned sequence, it grants ownership to the same named column
@@ -1023,6 +1106,8 @@ InsertMetadataForCitusLocalTable(Oid citusLocalTableId, uint64 shardId)
 }
 
 
+#include <access/xact.h>
+
 /*
  * FinalizeCitusLocalTableCreation completes creation of the citus local table
  * with relationId by performing operations that should be done after creating
@@ -1053,4 +1138,6 @@ FinalizeCitusLocalTableCreation(Oid relationId)
 	{
 		InvalidateForeignKeyGraph();
 	}
+
+	CommandCounterIncrement();
 }

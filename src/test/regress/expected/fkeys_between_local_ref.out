@@ -128,37 +128,38 @@ ROLLBACK;
 ALTER TABLE local_table_1 ADD COLUMN col_3 INT REFERENCES reference_table_1(col_1);
 ERROR:  cannot execute ADD COLUMN command with PRIMARY KEY, UNIQUE, FOREIGN and CHECK constraints
 BEGIN;
+  CREATE VIEW view_1 AS
+  SELECT col_1 AS "weird\'col_1", col_1+col_1 AS col_1_plus_col_1
+  FROM local_table_2;
+  CREATE MATERIALIZED VIEW mat_view_1 AS
+  SELECT local_table_4.col_1, local_table_3.col_1 + view_1.col_1_plus_col_1
+  FROM local_table_4, local_table_3, view_1;
+  CREATE TABLE another_table (int_col int, text_col int);
+  CREATE VIEW view_2 AS
+  SELECT *
+  FROM mat_view_1, view_1, another_table;
   -- define a foreign key so that all 4 local tables become citus local tables
   ALTER TABLE local_table_1 ADD CONSTRAINT fkey_11 FOREIGN KEY (col_1) REFERENCES reference_table_1(col_1);
+ERROR:  function 0xa71bb5 returned NULL
   CREATE TABLE local_table_5 (col_1 INT UNIQUE);
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
   -- now define foreign key from local to citus local table
   ALTER TABLE local_table_5 ADD CONSTRAINT fkey_12 FOREIGN KEY (col_1) REFERENCES local_table_2(col_1);
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
   -- now we have 5 citus local tables in this schema
   SELECT COUNT(*)=5 FROM citus_local_tables_in_schema;
- ?column?
----------------------------------------------------------------------
- t
-(1 row)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
   -- dropping foreign key from local_table_2 would only undistribute local_table_2 & local_table_5
   ALTER TABLE local_table_2 DROP CONSTRAINT fkey_1;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
   SELECT logicalrelid::regclass::text FROM citus_local_tables_in_schema ORDER BY logicalrelid;
- logicalrelid
----------------------------------------------------------------------
- local_table_1
- local_table_3
- local_table_4
-(3 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
     -- dropping local_table_1 would undistribute last two citus local tables as local_table_1
     -- was the bridge to reference table
   DROP TABLE local_table_1 CASCADE;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
   SELECT COUNT(*)=0 FROM citus_local_tables_in_schema;
- ?column?
----------------------------------------------------------------------
- t
-(1 row)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK;
 -- they fail as local_table_99 does not exist
 ALTER TABLE local_table_99 ADD CONSTRAINT fkey FOREIGN KEY (col_1) REFERENCES reference_table_1(col_1);
@@ -329,7 +330,7 @@ BEGIN;
 
   -- show that we validate foreign key constraints, errors out
   INSERT INTO local_table_5 VALUES (300);
-ERROR:  insert or update on table "local_table_5_1518070" violates foreign key constraint "local_table_5_col_1_fkey1_1518070"
+ERROR:  insert or update on table "local_table_5_1518067" violates foreign key constraint "local_table_5_col_1_fkey1_1518067"
 ROLLBACK;
 BEGIN;
   CREATE SCHEMA another_schema_fkeys_between_local_ref;

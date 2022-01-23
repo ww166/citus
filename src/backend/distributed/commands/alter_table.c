@@ -187,7 +187,6 @@ static void EnsureTableNotPartition(Oid relationId);
 static TableConversionState * CreateTableConversion(TableConversionParameters *params);
 static void CreateDistributedTableLike(TableConversionState *con);
 static void CreateCitusTableLike(TableConversionState *con);
-static List * GetViewCreationCommandsOfTable(Oid relationId);
 static void ReplaceTable(Oid sourceId, Oid targetId, List *justBeforeDropCommands,
 						 bool suppressNoticeMessages);
 static bool HasAnyGeneratedStoredColumns(Oid relationId);
@@ -202,7 +201,6 @@ static char * CreateWorkerChangeSequenceDependencyCommand(char *sequenceSchemaNa
 static bool WillRecreateForeignKeyToReferenceTable(Oid relationId,
 												   CascadeToColocatedOption cascadeOption);
 static void WarningsForDroppingForeignKeysWithDistributedTables(Oid relationId);
-static void ExecuteQueryViaSPI(char *query, int SPIOK);
 
 PG_FUNCTION_INFO_V1(undistribute_table);
 PG_FUNCTION_INFO_V1(alter_distributed_table);
