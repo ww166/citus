@@ -257,7 +257,7 @@ static bool SAORestrictions(ScalarArrayOpExpr *arrayOperatorExpression,
 							Var *partitionColumn,
 							List **requestedRestrictions);
 static void ErrorTypesDontMatch(Oid firstType, Oid firstCollId, Oid secondType,
-								Oid secondCollId);
+								Oid secondCollId, int elevel);
 static bool IsValidHashRestriction(OpExpr *opClause);
 static void AddHashRestrictionToInstance(ClauseWalkerContext *context, OpExpr *opClause,
 										 Var *varClause, Const *constantClause);
@@ -1106,7 +1106,7 @@ AddPartitionKeyRestrictionToInstance(ClauseWalkerContext *context, OpExpr *opCla
 	if (constantClause->consttype != partitionColumn->vartype)
 	{
 		/* we want our restriction value in terms of the type of the partition column */
-		constantClause = TransformPartitionRestrictionValue(partitionColumn,
+		constantClause = TransformVarRestrictionValue(partitionColumn,
 															constantClause, true);
 		if (constantClause == NULL)
 		{
@@ -1212,33 +1212,27 @@ AddPartitionKeyRestrictionToInstance(ClauseWalkerContext *context, OpExpr *opCla
 
 
 /*
- * TransformPartitionRestrictionValue works around how PostgreSQL sometimes
+ * TransformVarRestrictionValue works around how PostgreSQL sometimes
  * chooses to try to wrap our Var in a coercion rather than the Const.
  * To deal with this, we strip coercions from both and manually coerce
  * the Const into the type of our partition column.
- * It is conceivable that in some instances this may not be possible,
- * in those cases we will simply fail to prune partitions based on this clause.
  */
 Const *
-TransformPartitionRestrictionValue(Var *partitionColumn, Const *restrictionValue,
-								   bool missingOk)
+TransformVarRestrictionValue(Var *var, Const *restrictionValue, bool missingOk)
 {
 	Node *transformedValue = coerce_to_target_type(NULL, (Node *) restrictionValue,
 												   restrictionValue->consttype,
-												   partitionColumn->vartype,
-												   partitionColumn->vartypmod,
+												   var->vartype,
+												   var->vartypmod,
 												   COERCION_ASSIGNMENT,
 												   COERCE_IMPLICIT_CAST, -1);
 
 	/* if NULL, no implicit coercion is possible between the types */
 	if (transformedValue == NULL)
 	{
-		if (!missingOk)
-		{
-			ErrorTypesDontMatch(partitionColumn->vartype, partitionColumn->varcollid,
-								restrictionValue->consttype,
-								restrictionValue->constcollid);
-		}
+        int elevel = missingOk ? DEBUG1 : ERROR;
+        ErrorTypesDontMatch(var->vartype, var->varcollid, restrictionValue->consttype,
+                            restrictionValue->constcollid, elevel);
 
 		return NULL;
 	}
@@ -1252,12 +1246,9 @@ TransformPartitionRestrictionValue(Var *partitionColumn, Const *restrictionValue
 	/* if still not a constant, no immutable coercion matched */
 	if (!IsA(transformedValue, Const))
 	{
-		if (!missingOk)
-		{
-			ErrorTypesDontMatch(partitionColumn->vartype, partitionColumn->varcollid,
-								restrictionValue->consttype,
-								restrictionValue->constcollid);
-		}
+        int elevel = missingOk ? DEBUG1 : ERROR;
+        ErrorTypesDontMatch(var->vartype, var->varcollid, restrictionValue->consttype,
+                            restrictionValue->constcollid, elevel);
 
 		return NULL;
 	}
@@ -1270,7 +1261,8 @@ TransformPartitionRestrictionValue(Var *partitionColumn, Const *restrictionValue
  * ErrorTypesDontMatch throws an error explicitly printing the type names.
  */
 static void
-ErrorTypesDontMatch(Oid firstType, Oid firstCollId, Oid secondType, Oid secondCollId)
+ErrorTypesDontMatch(Oid firstType, Oid firstCollId, Oid secondType, Oid secondCollId,
+                    int elevel)
 {
 	Datum firstTypename =
 		DirectFunctionCall1Coll(regtypeout, firstCollId, ObjectIdGetDatum(firstType));
@@ -1278,9 +1270,9 @@ ErrorTypesDontMatch(Oid firstType, Oid firstCollId, Oid secondType, Oid secondCo
 	Datum secondTypename =
 		DirectFunctionCall1Coll(regtypeout, secondCollId, ObjectIdGetDatum(secondType));
 
-	ereport(ERROR, (errmsg("Cannot coerce %s to %s",
-						   DatumGetCString(secondTypename),
-						   DatumGetCString(firstTypename))));
+	ereport(elevel, (errmsg("Cannot coerce %s to %s",
+						    DatumGetCString(secondTypename),
+						    DatumGetCString(firstTypename))));
 }
 
 

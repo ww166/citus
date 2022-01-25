@@ -2632,7 +2632,7 @@ TargetShardIntervalForFastPathQuery(Query *query, bool *isMultiShardQuery,
 		{
 			bool missingOk = false;
 			inputDistributionKeyValue =
-				TransformPartitionRestrictionValue(distributionKey,
+				TransformVarRestrictionValue(distributionKey,
 												   inputDistributionKeyValue, missingOk);
 		}
 
@@ -2966,7 +2966,7 @@ BuildRoutesForInsert(Query *query, DeferredErrorMessage **planningError)
 		 * FuncExpr coercions for casts created with CREATE CAST ... WITH
 		 * FUNCTION .. AS IMPLICIT. To support this first we strip them here.
 		 * Then we do the coercion manually below using
-		 * TransformPartitionRestrictionValue, if the types are not the same.
+		 * TransformVarRestrictionValue, if the types are not the same.
 		 *
 		 * NOTE: eval_const_expressions below would do some of these removals
 		 * too, but it's unclear if it would do all of them. It is possible
@@ -3012,7 +3012,7 @@ BuildRoutesForInsert(Query *query, DeferredErrorMessage **planningError)
 		{
 			bool missingOk = false;
 			partitionValueConst =
-				TransformPartitionRestrictionValue(partitionColumn,
+				TransformVarRestrictionValue(partitionColumn,
 												   partitionValueConst,
 												   missingOk);
 		}

@@ -563,7 +563,7 @@ ShardPlacementForFunctionColocatedWithDistTable(DistObjectCacheEntry *procedure,
 	{
 		bool missingOk = false;
 		partitionValue =
-			TransformPartitionRestrictionValue(partitionColumn, partitionValue,
+			TransformVarRestrictionValue(partitionColumn, partitionValue,
 											   missingOk);
 	}
 

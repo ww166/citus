@@ -5083,6 +5083,10 @@ get_rule_expr_paren(Node *node, deparse_context *context,
 }
 
 
+#include "distributed/shard_pruning.h"
+static void
+TransformBinaryOpExprConst(OpExpr *opexpr);
+
 /* ----------
  * get_rule_expr			- Parse back an expression
  *
@@ -5228,9 +5232,11 @@ get_rule_expr(Node *node, deparse_context *context,
 			break;
 
 		case T_OpExpr:
-			get_oper_expr((OpExpr *) node, context);
-			break;
-
+            {
+                TransformBinaryOpExprConst((OpExpr *) node);
+                get_oper_expr((OpExpr *) node, context);
+			    break;
+            }
 		case T_DistinctExpr:
 			{
 				DistinctExpr *expr = (DistinctExpr *) node;
@@ -6308,6 +6314,67 @@ get_rule_expr(Node *node, deparse_context *context,
 			break;
 	}
 }
+
+
+/*
+ * transform CoerceViaIO -> Const
+ */
+static void
+TransformBinaryOpExprConst(OpExpr *opexpr)
+{
+    RelabelType *relabelPtr = NULL;
+    Var *var = NULL;
+
+    if (list_length(opexpr->args) != 2)
+    {
+        return;
+    }
+
+    Node *arg1 = linitial(opexpr->args);
+    Node *arg2 = lsecond(opexpr->args);
+    if (IsA(arg1, RelabelType) && IsA(arg2, Var))
+    {
+        relabelPtr = (RelabelType *) arg1;
+        var = (Var *) arg2;
+    }
+    else if (IsA(arg1, Var) && IsA(arg2, RelabelType))
+    {
+        var = (Var *) arg1;
+        relabelPtr = (RelabelType *) arg2;
+    }
+    else
+    {
+        /* not a "Var OP RelabelType" or "RelabelType OR Var" */
+        return;
+    }
+
+    /*
+     * TODO: Probably need to consider multiple casts too ?
+     */
+
+    if (!IsA(relabelPtr->arg, CoerceViaIO))
+    {
+        return;
+    }
+
+    if (!IsA(((CoerceViaIO *) relabelPtr->arg)->arg, Const))
+    {
+        return;
+    }
+
+    /*
+     * return NULL if TransformVarRestrictionValue fails to transform
+     * and issue DEBUG1
+     */
+    bool missingOk = true;
+    Const *transformedValue =
+        TransformVarRestrictionValue(var, ((Const *)((CoerceViaIO *) relabelPtr->arg)->arg), missingOk);
+    if (transformedValue)
+    {
+        relabelPtr->arg = ((Expr *) transformedValue);
+    }
+}
+
 
 /*
  * get_rule_expr_toplevel		- Parse back a toplevel expression

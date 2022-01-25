@@ -21,9 +21,7 @@ extern List * PruneShards(Oid relationId, Index rangeTableId, List *whereClauseL
 						  Const **partitionValueConst);
 extern bool ContainsFalseClause(List *whereClauseList);
 extern List * get_all_actual_clauses(List *restrictinfo_list);
-extern Const * TransformPartitionRestrictionValue(Var *partitionColumn,
-												  Const *restrictionValue,
-												  bool missingOk);
+extern Const * TransformVarRestrictionValue(Var *var, Const *restrictionValue, bool missingOk);
 bool VarConstOpExprClause(OpExpr *opClause, Var **varClause, Const **constantClause);
 
 #endif /* SHARD_PRUNING_H_ */
