@@ -56,14 +56,10 @@ column_name_to_column(PG_FUNCTION_ARGS)
 	text *columnText = PG_GETARG_TEXT_P(1);
 	char *columnName = text_to_cstring(columnText);
 
-	Relation relation = relation_open(relationId, AccessShareLock);
-
-	Var *column = BuildDistributionKeyFromColumnName(relation, columnName);
+	Var *column = BuildDistributionKeyFromColumnName(relationId, columnName);
 	Assert(column != NULL);
 	char *columnNodeString = nodeToString(column);
 	text *columnNodeText = cstring_to_text(columnNodeString);
-
-	relation_close(relation, AccessShareLock);
 
 	PG_RETURN_TEXT_P(columnNodeText);
 }
@@ -81,12 +77,8 @@ column_name_to_column_id(PG_FUNCTION_ARGS)
 	Oid distributedTableId = PG_GETARG_OID(0);
 	char *columnName = PG_GETARG_CSTRING(1);
 
-	Relation relation = relation_open(distributedTableId, AccessExclusiveLock);
-
-	Var *column = BuildDistributionKeyFromColumnName(relation, columnName);
+	Var *column = BuildDistributionKeyFromColumnName(distributedTableId, columnName);
 	Assert(column != NULL);
-
-	relation_close(relation, NoLock);
 
 	PG_RETURN_INT16((int16) column->varattno);
 }
@@ -105,10 +97,16 @@ column_to_column_name(PG_FUNCTION_ARGS)
 
 	Oid relationId = PG_GETARG_OID(0);
 	text *columnNodeText = PG_GETARG_TEXT_P(1);
-
 	char *columnNodeString = text_to_cstring(columnNodeText);
+	Node *columnNode = stringToNode(columnNodeString);
 
-	char *columnName = ColumnToColumnName(relationId, columnNodeString);
+	if (!IsA(columnNode, Var))
+	{
+		ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+						errmsg("not a column")));
+	}
+
+	char *columnName = ColumnToColumnName(relationId, (Var *) columnNode);
 
 	text *columnText = cstring_to_text(columnName);
 
@@ -173,21 +171,21 @@ FindColumnWithNameOnTargetRelation(Oid sourceRelationId, char *sourceColumnName,
  * corresponds to reference tables.
  */
 Var *
-BuildDistributionKeyFromColumnName(Relation distributedRelation, char *columnName)
+BuildDistributionKeyFromColumnName(Oid relationId, char *columnName)
 {
-	char *tableName = RelationGetRelationName(distributedRelation);
-
 	/* short circuit for reference tables */
 	if (columnName == NULL)
 	{
 		return NULL;
 	}
 
+	char *tableName = get_rel_name(relationId);
+
 	/* it'd probably better to downcase identifiers consistent with SQL case folding */
 	truncate_identifier(columnName, strlen(columnName), true);
 
 	/* lookup column definition */
-	HeapTuple columnTuple = SearchSysCacheAttName(RelationGetRelid(distributedRelation),
+	HeapTuple columnTuple = SearchSysCacheAttName(relationId,
 												  columnName);
 	if (!HeapTupleIsValid(columnTuple))
 	{
@@ -223,10 +221,8 @@ BuildDistributionKeyFromColumnName(Relation distributedRelation, char *columnNam
  * provided Var refers to a system column.
  */
 char *
-ColumnToColumnName(Oid relationId, char *columnNodeString)
+ColumnToColumnName(Oid relationId, Var *columnNode)
 {
-	Node *columnNode = stringToNode(columnNodeString);
-
 	if (columnNode == NULL || !IsA(columnNode, Var))
 	{
 		ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),

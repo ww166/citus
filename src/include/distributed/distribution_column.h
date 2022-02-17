@@ -22,8 +22,8 @@
 extern Var * FindColumnWithNameOnTargetRelation(Oid sourceRelationId,
 												char *sourceColumnName,
 												Oid targetRelationId);
-extern Var * BuildDistributionKeyFromColumnName(Relation distributedRelation,
+extern Var * BuildDistributionKeyFromColumnName(Oid relationId,
 												char *columnName);
-extern char * ColumnToColumnName(Oid relationId, char *columnNodeString);
+extern char * ColumnToColumnName(Oid relationId, Var *columnNode);
 
 #endif   /* DISTRIBUTION_COLUMN_H */
