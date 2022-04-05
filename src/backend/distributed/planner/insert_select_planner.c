@@ -380,9 +380,8 @@ CreateInsertSelectIntoLocalTablePlan(uint64 planId, Query *originalQuery, ParamL
 	RangeTblEntry *insertRte = ExtractResultRelationRTEOrError(insertSelectQuery);
 	Oid targetRelationId = insertRte->relid;
 
-	Query *selectQuery = BuildSelectForInsertSelect(insertSelectQuery);
+	Query *selectQuery = selectRte->subquery;
 
-	selectRte->subquery = selectQuery;
 	ReorderInsertSelectTargetLists(insertSelectQuery, insertRte, selectRte);
 
 	/*
@@ -394,7 +393,10 @@ CreateInsertSelectIntoLocalTablePlan(uint64 planId, Query *originalQuery, ParamL
 							 selectQuery->targetList,
 							 targetRelationId);
 
-	insertSelectQuery->cteList = NIL;
+	/* wrap select with a subquery if necessary */
+	selectQuery = BuildSelectForInsertSelect(insertSelectQuery);
+	selectRte->subquery = selectQuery;
+
 	DistributedPlan *distPlan = CreateDistributedPlan(planId, selectQuery,
 													  copyObject(selectQuery),
 													  boundParams, hasUnresolvedParams,

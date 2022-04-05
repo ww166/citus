@@ -331,6 +331,10 @@ BuildSelectForInsertSelect(Query *insertSelectQuery)
 		/* top-level set operations confuse the ReorderInsertSelectTargetLists logic */
 		selectQuery = WrapSubquery(selectRte->subquery);
 	}
+	else if (selectQuery->groupClause != NULL)
+	{
+		selectQuery = WrapSubquery(selectRte->subquery);
+	}
 
 	return selectQuery;
 }
