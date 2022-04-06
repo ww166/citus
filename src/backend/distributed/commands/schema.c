@@ -76,7 +76,7 @@ PreprocessCreateSchemaStmt(Node *node, const char *queryString,
 
 	commands = lappend(commands, ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -136,7 +136,7 @@ PreprocessDropSchemaStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -178,7 +178,7 @@ PreprocessGrantOnSchemaStmt(Node *node, const char *queryString,
 
 	stmt->objects = originalObjects;
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, list_make1(sql));
+	return NodeDDLTaskList(list_make1(sql));
 }
 
 
@@ -215,7 +215,7 @@ PreprocessAlterSchemaRenameStmt(Node *node, const char *queryString,
 								(void *) renameStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 

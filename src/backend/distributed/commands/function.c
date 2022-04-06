@@ -241,7 +241,7 @@ create_distributed_function(PG_FUNCTION_ARGS)
 		initStringInfo(&ddlCommand);
 		appendStringInfo(&ddlCommand, "%s;%s;%s;%s", DISABLE_METADATA_SYNC,
 						 createFunctionSQL, alterFunctionOwnerSQL, ENABLE_METADATA_SYNC);
-		SendCommandToWorkersAsUser(NON_COORDINATOR_NODES, CurrentUserName(),
+		SendCommandToWorkersAsUser(OTHER_NODES, CurrentUserName(),
 								   ddlCommand.data);
 	}
 
@@ -1389,7 +1389,7 @@ PostprocessCreateFunctionStmt(Node *node, const char *queryString)
 							   &functionAddress));
 	commands = list_concat(commands, list_make1(ENABLE_DDL_PROPAGATION));
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -1503,7 +1503,7 @@ PreprocessAlterFunctionStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -1537,7 +1537,7 @@ PreprocessRenameFunctionStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -1569,7 +1569,7 @@ PreprocessAlterFunctionSchemaStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -1602,7 +1602,7 @@ PreprocessAlterFunctionOwnerStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -1731,7 +1731,7 @@ PreprocessDropFunctionStmt(Node *node, const char *queryString,
 								(void *) dropStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 

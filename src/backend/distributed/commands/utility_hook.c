@@ -1521,14 +1521,14 @@ DDLTaskList(Oid relationId, const char *commandString)
 
 
 /*
- * NodeDDLTaskList builds a list of tasks to execute a DDL command on a
- * given target set of nodes.
+ * NodeDDLTaskList builds a list of tasks to execute a DDL command on all
+ * other primary nodes in the cluster.
  */
 List *
-NodeDDLTaskList(TargetWorkerSet targets, List *commands)
+NodeDDLTaskList(List *commands)
 {
 	/* don't allow concurrent node list changes that require an exclusive lock */
-	List *workerNodes = TargetWorkerSetNodeList(targets, RowShareLock);
+	List *workerNodes = TargetWorkerSetNodeList(OTHER_NODES, RowShareLock);
 
 	if (list_length(workerNodes) <= 0)
 	{

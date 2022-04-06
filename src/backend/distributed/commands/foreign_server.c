@@ -58,7 +58,7 @@ PreprocessCreateForeignServerStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -88,7 +88,7 @@ PreprocessAlterForeignServerStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -120,7 +120,7 @@ PreprocessRenameForeignServerStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -152,7 +152,7 @@ PreprocessAlterForeignServerOwnerStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -206,7 +206,7 @@ PreprocessDropForeignServerStmt(Node *node, const char *queryString,
 								(void *) deparsedStmt,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 

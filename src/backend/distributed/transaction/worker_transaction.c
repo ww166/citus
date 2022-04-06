@@ -148,22 +148,22 @@ SendCommandToWorkersWithMetadataViaSuperUser(const char *command)
 List *
 TargetWorkerSetNodeList(TargetWorkerSet targetWorkerSet, LOCKMODE lockMode)
 {
-	List *workerNodeList = NIL;
-	if (targetWorkerSet == ALL_SHARD_NODES)
-	{
-		workerNodeList = ActivePrimaryNodeList(lockMode);
-	}
-	else
-	{
-		workerNodeList = ActivePrimaryNonCoordinatorNodeList(lockMode);
-	}
+	List *workerNodeList = ActivePrimaryNodeList(lockMode);
 	List *result = NIL;
+	int localGroupId = GetLocalGroupId();
 
 	WorkerNode *workerNode = NULL;
 	foreach_ptr(workerNode, workerNodeList)
 	{
-		if (targetWorkerSet == NON_COORDINATOR_METADATA_NODES && !workerNode->hasMetadata)
+		if (targetWorkerSet == OTHER_METADATA_NODES && !workerNode->hasMetadata)
 		{
+			/* skip non-metadata nodes */
+			continue;
+		}
+
+		if (workerNode->groupId == localGroupId)
+		{
+			/* skip self */
 			continue;
 		}
 
@@ -184,7 +184,7 @@ TargetWorkerSetNodeList(TargetWorkerSet targetWorkerSet, LOCKMODE lockMode)
 void
 SendBareCommandListToMetadataWorkers(List *commandList)
 {
-	TargetWorkerSet targetWorkerSet = NON_COORDINATOR_METADATA_NODES;
+	TargetWorkerSet targetWorkerSet = OTHER_METADATA_NODES;
 	List *workerNodeList = TargetWorkerSetNodeList(targetWorkerSet, RowShareLock);
 	char *nodeUser = CurrentUserName();
 
@@ -225,12 +225,12 @@ SendCommandToMetadataWorkersParams(const char *command,
 								   const Oid *parameterTypes,
 								   const char *const *parameterValues)
 {
-	List *workerNodeList = TargetWorkerSetNodeList(NON_COORDINATOR_METADATA_NODES,
+	List *workerNodeList = TargetWorkerSetNodeList(OTHER_METADATA_NODES,
 												   RowShareLock);
 
 	ErrorIfAnyMetadataNodeOutOfSync(workerNodeList);
 
-	SendCommandToWorkersParamsInternal(NON_COORDINATOR_METADATA_NODES, command, user,
+	SendCommandToWorkersParamsInternal(OTHER_METADATA_NODES, command, user,
 									   parameterCount, parameterTypes,
 									   parameterValues);
 }

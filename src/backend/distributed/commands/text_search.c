@@ -112,7 +112,7 @@ PostprocessCreateTextSearchConfigurationStmt(Node *node, const char *queryString
 	commands = lcons(DISABLE_DDL_PROPAGATION, commands);
 	commands = lappend(commands, ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -162,7 +162,7 @@ PostprocessCreateTextSearchDictionaryStmt(Node *node, const char *queryString)
 								(void *) createTSDictionaryStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -281,7 +281,7 @@ PreprocessDropTextSearchConfigurationStmt(Node *node, const char *queryString,
 								(void *) dropStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -332,7 +332,7 @@ PreprocessDropTextSearchDictionaryStmt(Node *node, const char *queryString,
 								(void *) dropStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -423,7 +423,7 @@ PreprocessAlterTextSearchConfigurationStmt(Node *node, const char *queryString,
 								(void *) alterStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -454,7 +454,7 @@ PreprocessAlterTextSearchDictionaryStmt(Node *node, const char *queryString,
 								(void *) alterStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -487,7 +487,7 @@ PreprocessRenameTextSearchConfigurationStmt(Node *node, const char *queryString,
 								(void *) ddlCommand,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -520,7 +520,7 @@ PreprocessRenameTextSearchDictionaryStmt(Node *node, const char *queryString,
 								(void *) ddlCommand,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -554,7 +554,7 @@ PreprocessAlterTextSearchConfigurationSchemaStmt(Node *node, const char *querySt
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -588,7 +588,7 @@ PreprocessAlterTextSearchDictionarySchemaStmt(Node *node, const char *queryStrin
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -675,7 +675,7 @@ PreprocessTextSearchConfigurationCommentStmt(Node *node, const char *queryString
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -708,7 +708,7 @@ PreprocessTextSearchDictionaryCommentStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -741,7 +741,7 @@ PreprocessAlterTextSearchConfigurationOwnerStmt(Node *node, const char *queryStr
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -774,7 +774,7 @@ PreprocessAlterTextSearchDictionaryOwnerStmt(Node *node, const char *queryString
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 

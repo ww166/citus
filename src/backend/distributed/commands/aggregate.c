@@ -85,5 +85,5 @@ PostprocessDefineAggregateStmt(Node *node, const char *queryString)
 	commands = lcons(DISABLE_DDL_PROPAGATION, commands);
 	commands = lappend(commands, ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }

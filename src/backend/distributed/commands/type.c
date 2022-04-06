@@ -191,7 +191,7 @@ PostprocessCompositeTypeStmt(Node *node, const char *queryString)
 								(void *) compositeTypeStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -231,7 +231,7 @@ PreprocessAlterTypeStmt(Node *node, const char *queryString,
 								(void *) alterTypeStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -307,7 +307,7 @@ PostprocessCreateEnumStmt(Node *node, const char *queryString)
 								(void *) createEnumStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -356,7 +356,7 @@ PreprocessAlterEnumStmt(Node *node, const char *queryString,
 								(void *) alterEnumStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -422,7 +422,7 @@ PreprocessDropTypeStmt(Node *node, const char *queryString,
 								dropStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -459,7 +459,7 @@ PreprocessRenameTypeStmt(Node *node, const char *queryString,
 								(void *) renameStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -495,7 +495,7 @@ PreprocessRenameTypeAttributeStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -529,7 +529,7 @@ PreprocessAlterTypeSchemaStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -587,7 +587,7 @@ PreprocessAlterTypeOwnerStmt(Node *node, const char *queryString,
 								(void *) sql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 

@@ -174,7 +174,7 @@ PostprocessCreateExtensionStmt(Node *node, const char *queryString)
 
 	EnsureDependenciesExistOnAllNodes(&extensionAddress);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -281,7 +281,7 @@ PreprocessDropExtensionStmt(Node *node, const char *queryString,
 								(void *) deparsedStmt,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -388,7 +388,7 @@ PreprocessAlterExtensionSchemaStmt(Node *node, const char *queryString,
 								(void *) alterExtensionStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
@@ -447,7 +447,7 @@ PreprocessAlterExtensionUpdateStmt(Node *node, const char *queryString,
 								(void *) alterExtensionStmtSql,
 								ENABLE_DDL_PROPAGATION);
 
-	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+	return NodeDDLTaskList(commands);
 }
 
 
