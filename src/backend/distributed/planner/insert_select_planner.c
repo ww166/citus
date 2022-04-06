@@ -921,8 +921,6 @@ ReorderInsertSelectTargetLists(Query *originalQuery, RangeTblEntry *insertRte,
 
 	Query *subquery = subqueryRte->subquery;
 
-	Oid insertRelationId = insertRte->relid;
-
 	/*
 	 * We implement the following algorithm for the reoderding:
 	 *  - Iterate over the INSERT target list entries
@@ -938,8 +936,6 @@ ReorderInsertSelectTargetLists(Query *originalQuery, RangeTblEntry *insertRte,
 	{
 		TargetEntry *oldInsertTargetEntry = lfirst(insertTargetEntryCell);
 		TargetEntry *newSubqueryTargetEntry = NULL;
-		AttrNumber originalAttrNo = get_attnum(insertRelationId,
-											   oldInsertTargetEntry->resname);
 
 		/* see transformInsertRow() for the details */
 		if (IsA(oldInsertTargetEntry->expr, ArrayRef) ||
@@ -993,10 +989,13 @@ ReorderInsertSelectTargetLists(Query *originalQuery, RangeTblEntry *insertRte,
 		 */
 		Assert(!newSubqueryTargetEntry->resjunk);
 
-		Var *newSubqueryVar = makeVarFromTargetEntry(subqueryVarNo,
-													 newSubqueryTargetEntry);
-		TargetEntry *newInsertTargetEntry = makeTargetEntry((Expr *) newSubqueryVar,
-															originalAttrNo,
+		Var *newInsertVar = makeVar(subqueryVarNo, resno,
+									exprType((Node *) newSubqueryTargetEntry->expr),
+									exprTypmod((Node *) newSubqueryTargetEntry->expr),
+									exprCollation((Node *) newSubqueryTargetEntry->expr),
+									0);
+		TargetEntry *newInsertTargetEntry = makeTargetEntry((Expr *) newInsertVar,
+															oldInsertTargetEntry->resno,
 															oldInsertTargetEntry->resname,
 															oldInsertTargetEntry->resjunk);
 
@@ -1441,9 +1440,8 @@ CreateNonPushableInsertSelectPlan(uint64 planId, Query *parse, ParamListInfo bou
 		return distributedPlan;
 	}
 
-	Query *selectQuery = BuildSelectForInsertSelect(insertSelectQuery);
+	Query *selectQuery = selectRte->subquery;
 
-	selectRte->subquery = selectQuery;
 	ReorderInsertSelectTargetLists(insertSelectQuery, insertRte, selectRte);
 
 	/*
@@ -1463,6 +1461,9 @@ CreateNonPushableInsertSelectPlan(uint64 planId, Query *parse, ParamListInfo bou
 	 */
 	List *insertTargetList = insertSelectQuery->targetList;
 	RelabelTargetEntryList(selectQuery->targetList, insertTargetList);
+
+	selectQuery = BuildSelectForInsertSelect(insertSelectQuery);
+	selectRte->subquery = selectQuery;
 
 	/*
 	 * Make a copy of the select query, since following code scribbles it

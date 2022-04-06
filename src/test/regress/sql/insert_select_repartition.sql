@@ -633,6 +633,33 @@ insert into table_with_user_sequences values (1,1);
 select create_distributed_table('table_with_user_sequences','x');
 explain (costs off) insert into table_with_user_sequences select y, x from table_with_user_sequences;
 
+CREATE TABLE dist_table_1(
+  dist_col integer,
+  text_col text
+);
+SELECT create_distributed_table('dist_table_1', 'dist_col');
+
+INSERT INTO dist_table_1 VALUES (1, 'string_1');
+
+CREATE TABLE dist_table_2(
+  dist_col integer
+);
+INSERT INTO dist_table_2 VALUES (1);
+
+SELECT create_distributed_table('dist_table_2', 'dist_col');
+
+WITH a AS (SELECT random())
+INSERT INTO dist_table_1
+SELECT
+  t1.dist_col,
+  'string_2'
+FROM a, dist_table_1 t1
+JOIN dist_table_2 t2
+USING (dist_col)
+LIMIT 1;
+
+SELECT * FROM dist_table_1 ORDER BY 1,2;
+
 -- clean-up
 SET client_min_messages TO WARNING;
 DROP SCHEMA insert_select_repartition CASCADE;
