@@ -1412,9 +1412,8 @@ CreateNonPushableInsertSelectPlan(uint64 planId, Query *parse, ParamListInfo bou
 		return distributedPlan;
 	}
 
-	Query *selectQuery = BuildSelectForInsertSelect(insertSelectQuery);
+	Query *selectQuery = selectRte->subquery;
 
-	selectRte->subquery = selectQuery;
 	ReorderInsertSelectTargetLists(insertSelectQuery, insertRte, selectRte);
 
 	/*
@@ -1434,6 +1433,9 @@ CreateNonPushableInsertSelectPlan(uint64 planId, Query *parse, ParamListInfo bou
 	 */
 	List *insertTargetList = insertSelectQuery->targetList;
 	RelabelTargetEntryList(selectQuery->targetList, insertTargetList);
+
+	selectQuery = BuildSelectForInsertSelect(insertSelectQuery);
+	selectRte->subquery = selectQuery;
 
 	/*
 	 * Make a copy of the select query, since following code scribbles it

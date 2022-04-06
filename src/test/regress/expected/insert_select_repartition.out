@@ -500,7 +500,7 @@ INSERT INTO target_table
 SELECT mapped_key, c FROM t NATURAL JOIN source_table;
 DEBUG:  volatile functions are not allowed in distributed INSERT ... SELECT queries
 DEBUG:  generating subplan XXX_1 for CTE t: SELECT mapped_key, a, c FROM insert_select_repartition.source_table WHERE ((a)::double precision OPERATOR(pg_catalog.>) floor(random()))
-DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT mapped_key AS a, (c)::integer[] AS b FROM (SELECT t.mapped_key, t.c FROM ((SELECT intermediate_result.mapped_key, intermediate_result.a, intermediate_result.c FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(mapped_key integer, a integer, c double precision[])) t JOIN insert_select_repartition.source_table USING (mapped_key, a, c))) citus_insert_select_subquery
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT a, b FROM (SELECT t.mapped_key AS a, (t.c)::integer[] AS b FROM ((SELECT intermediate_result.mapped_key, intermediate_result.a, intermediate_result.c FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(mapped_key integer, a integer, c double precision[])) t JOIN insert_select_repartition.source_table USING (mapped_key, a, c))) citus_insert_select_subquery
 DEBUG:  performing repartitioned INSERT ... SELECT
 RESET client_min_messages;
 SELECT * FROM target_table ORDER BY a;
@@ -758,7 +758,7 @@ DEBUG:  only SELECT, UPDATE, or DELETE common table expressions may be router pl
 DEBUG:  generating subplan XXX_1 for CTE r: INSERT INTO insert_select_repartition.target_table (a, b) SELECT a, b FROM insert_select_repartition.source_table RETURNING target_table.a, target_table.b
 DEBUG:  INSERT target table and the source relation of the SELECT partition column value must be colocated in distributed INSERT ... SELECT
 DEBUG:  Router planner cannot handle multi-shard select queries
-DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT a, max AS b FROM (SELECT source_table.a, max(source_table.b) AS max FROM (insert_select_repartition.source_table JOIN (SELECT intermediate_result.a, intermediate_result.b FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(a integer, b integer)) r USING (a, b)) GROUP BY source_table.a) citus_insert_select_subquery
+DEBUG:  Plan XXX query after replacing subqueries and CTEs: SELECT a, b FROM (SELECT source_table.a, max(source_table.b) AS b FROM (insert_select_repartition.source_table JOIN (SELECT intermediate_result.a, intermediate_result.b FROM read_intermediate_result('XXX_1'::text, 'binary'::citus_copy_format) intermediate_result(a integer, b integer)) r USING (a, b)) GROUP BY source_table.a) citus_insert_select_subquery
 DEBUG:  Router planner cannot handle multi-shard select queries
 DEBUG:  performing repartitioned INSERT ... SELECT
 DEBUG:  performing repartitioned INSERT ... SELECT
@@ -1292,6 +1292,45 @@ explain (costs off) insert into table_with_user_sequences select y, x from table
                Node: host=localhost port=xxxxx dbname=regression
                ->  Seq Scan on table_with_user_sequences_4213652 table_with_user_sequences
 (8 rows)
+
+CREATE TABLE dist_table_1(
+  dist_col integer,
+  text_col text
+);
+SELECT create_distributed_table('dist_table_1', 'dist_col');
+ create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+INSERT INTO dist_table_1 VALUES (1, 'string_1');
+CREATE TABLE dist_table_2(
+  dist_col integer
+);
+INSERT INTO dist_table_2 VALUES (1);
+SELECT create_distributed_table('dist_table_2', 'dist_col');
+NOTICE:  Copying data from local table...
+NOTICE:  copying the data has completed
+ create_distributed_table
+---------------------------------------------------------------------
+
+(1 row)
+
+WITH a AS (SELECT random())
+INSERT INTO dist_table_1
+SELECT
+  t1.dist_col,
+  'string_2'
+FROM a, dist_table_1 t1
+JOIN dist_table_2 t2
+USING (dist_col)
+LIMIT 1;
+SELECT * FROM dist_table_1 ORDER BY 1,2;
+ dist_col | text_col
+---------------------------------------------------------------------
+        1 | string_1
+        1 | string_2
+(2 rows)
 
 -- clean-up
 SET client_min_messages TO WARNING;
