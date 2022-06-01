@@ -374,10 +374,27 @@ CreateInsertSelectIntoLocalTablePlan(uint64 planId, Query *originalQuery, ParamL
 									 boundParams, bool hasUnresolvedParams,
 									 PlannerRestrictionContext *plannerRestrictionContext)
 {
-	RangeTblEntry *selectRte = ExtractSelectRangeTableEntry(originalQuery);
+	Query *insertSelectQuery = copyObject(originalQuery);
 
-	Query *selectQuery = BuildSelectForInsertSelect(originalQuery);
-	originalQuery->cteList = NIL;
+	RangeTblEntry *selectRte = ExtractSelectRangeTableEntry(insertSelectQuery);
+	RangeTblEntry *insertRte = ExtractResultRelationRTEOrError(insertSelectQuery);
+	Oid targetRelationId = insertRte->relid;
+
+	Query *selectQuery = BuildSelectForInsertSelect(insertSelectQuery);
+
+	selectRte->subquery = selectQuery;
+	ReorderInsertSelectTargetLists(insertSelectQuery, insertRte, selectRte);
+
+	/*
+	 * Cast types of insert target list and select projection list to
+	 * match the column types of the target relation.
+	 */
+	selectQuery->targetList =
+		AddInsertSelectCasts(insertSelectQuery->targetList,
+							 selectQuery->targetList,
+							 targetRelationId);
+
+	insertSelectQuery->cteList = NIL;
 	DistributedPlan *distPlan = CreateDistributedPlan(planId, selectQuery,
 													  copyObject(selectQuery),
 													  boundParams, hasUnresolvedParams,
@@ -417,7 +434,7 @@ CreateInsertSelectIntoLocalTablePlan(uint64 planId, Query *originalQuery, ParamL
 	 * distributed select instead of returning it.
 	 */
 	selectRte->subquery = distPlan->combineQuery;
-	distPlan->combineQuery = originalQuery;
+	distPlan->combineQuery = insertSelectQuery;
 
 	return distPlan;
 }
@@ -882,10 +899,23 @@ ReorderInsertSelectTargetLists(Query *originalQuery, RangeTblEntry *insertRte,
 	List *newSubqueryTargetlist = NIL;
 	List *newInsertTargetlist = NIL;
 	int resno = 1;
-	Index insertTableId = 1;
 	int targetEntryIndex = 0;
 
-	AssertArg(InsertSelectIntoCitusTable(originalQuery));
+	/*
+	 * Callers of this function are already sure about the fact that whole
+	 * SELECT query is wrapped in a subquery and hence represented by a single
+	 * RTE in the top-level.
+	 *
+	 * This is either done by postgres or by us by calling
+	 * BuildSelectForInsertSelect function for the query tree.
+	 *
+	 * And hence, while the first RTE always belongs to the table that we're
+	 * inserting into, the second one belongs to the subquery mentioned above.
+	 */
+	Index subqueryVarNo = 2;
+
+	AssertArg(InsertSelectIntoCitusTable(originalQuery) ||
+			  InsertSelectIntoLocalTable(originalQuery));
 
 	Query *subquery = subqueryRte->subquery;
 
@@ -961,12 +991,9 @@ ReorderInsertSelectTargetLists(Query *originalQuery, RangeTblEntry *insertRte,
 		 */
 		Assert(!newSubqueryTargetEntry->resjunk);
 
-		Var *newInsertVar = makeVar(insertTableId, originalAttrNo,
-									exprType((Node *) newSubqueryTargetEntry->expr),
-									exprTypmod((Node *) newSubqueryTargetEntry->expr),
-									exprCollation((Node *) newSubqueryTargetEntry->expr),
-									0);
-		TargetEntry *newInsertTargetEntry = makeTargetEntry((Expr *) newInsertVar,
+		Var *newSubqueryVar = makeVarFromTargetEntry(subqueryVarNo,
+													 newSubqueryTargetEntry);
+		TargetEntry *newInsertTargetEntry = makeTargetEntry((Expr *) newSubqueryVar,
 															originalAttrNo,
 															oldInsertTargetEntry->resname,
 															oldInsertTargetEntry->resjunk);
@@ -1554,6 +1581,13 @@ AddInsertSelectCasts(List *insertTargetList, List *selectTargetList,
 		Var *insertColumn = (Var *) insertEntry->expr;
 		Form_pg_attribute attr = TupleDescAttr(destTupleDescriptor,
 											   insertEntry->resno - 1);
+
+		/*
+		 * Assert that insert and select target entries created by
+		 * ReorderInsertSelectTargetLists() have the expressions of the same
+		 * type.
+		 */
+		Assert(insertColumn->vartype == exprType((Node *) selectEntry->expr));
 
 		Oid sourceType = insertColumn->vartype;
 		Oid targetType = attr->atttypid;
