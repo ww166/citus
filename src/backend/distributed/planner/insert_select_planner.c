@@ -380,23 +380,21 @@ CreateInsertSelectIntoLocalTablePlan(uint64 planId, Query *originalQuery, ParamL
 	RangeTblEntry *insertRte = ExtractResultRelationRTEOrError(insertSelectQuery);
 	Oid targetRelationId = insertRte->relid;
 
-	Query *selectQuery = BuildSelectForInsertSelect(insertSelectQuery);
-
-	selectRte->subquery = selectQuery;
 	ReorderInsertSelectTargetLists(insertSelectQuery, insertRte, selectRte);
 
 	/*
 	 * Cast types of insert target list and select projection list to
 	 * match the column types of the target relation.
 	 */
-	selectQuery->targetList =
+	selectRte->subquery->targetList =
 		AddInsertSelectCasts(insertSelectQuery->targetList,
-							 selectQuery->targetList,
+							 selectRte->subquery->targetList,
 							 targetRelationId);
 
+	selectRte->subquery = BuildSelectForInsertSelect(insertSelectQuery);
 	insertSelectQuery->cteList = NIL;
-	DistributedPlan *distPlan = CreateDistributedPlan(planId, selectQuery,
-													  copyObject(selectQuery),
+	DistributedPlan *distPlan = CreateDistributedPlan(planId, selectRte->subquery,
+													  copyObject(selectRte->subquery),
 													  boundParams, hasUnresolvedParams,
 													  plannerRestrictionContext);
 
