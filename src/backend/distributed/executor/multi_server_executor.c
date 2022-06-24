@@ -76,7 +76,7 @@ JobExecutorType(DistributedPlan *distributedPlan)
 	 * defers creating the tasks, so the task list might be NIL. Still, it sets the
 	 * partitionKeyValue and we print it here.
 	 */
-	if (list_length(job->taskList) <= 1 && IsLoggableLevel(DEBUG2))
+	if (list_length(job->taskList) <= 1 && message_level_is_interesting(DEBUG2))
 	{
 		Const *partitionValueConst = job->partitionKeyValue;
 

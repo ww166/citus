@@ -465,7 +465,7 @@ PruneShards(Oid relationId, Index rangeTableId, List *whereClauseList,
 		}
 		foundRestriction = true;
 
-		if (IsLoggableLevel(DEBUG3) && pruneOneList)
+		if (message_level_is_interesting(DEBUG3) && pruneOneList)
 		{
 			debugLoggedPruningInstances = lappend(debugLoggedPruningInstances, prune);
 		}
@@ -478,7 +478,7 @@ PruneShards(Oid relationId, Index rangeTableId, List *whereClauseList,
 									  cacheEntry->shardIntervalArrayLength);
 	}
 
-	if (IsLoggableLevel(DEBUG3))
+	if (message_level_is_interesting(DEBUG3))
 	{
 		char *relationName = get_rel_name(relationId);
 		if (foundRestriction && debugLoggedPruningInstances != NIL)

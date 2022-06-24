@@ -3900,7 +3900,7 @@ JoinPrunable(RangeTableFragment *leftFragment, RangeTableFragment *rightFragment
 	bool overlap = ShardIntervalsOverlap(leftFragmentInterval, rightFragmentInterval);
 	if (!overlap)
 	{
-		if (IsLoggableLevel(DEBUG2))
+		if (message_level_is_interesting(DEBUG2))
 		{
 			StringInfo leftString = FragmentIntervalString(leftFragmentInterval);
 			StringInfo rightString = FragmentIntervalString(rightFragmentInterval);

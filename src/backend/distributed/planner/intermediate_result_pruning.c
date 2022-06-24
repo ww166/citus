@@ -417,7 +417,7 @@ LogIntermediateResultMulticastSummary(IntermediateResultsHashEntry *entry,
 		logLevel = DEBUG1;
 	}
 
-	if (IsLoggableLevel(logLevel))
+	if (message_level_is_interesting(logLevel))
 	{
 		if (entry->writeLocalFile)
 		{

@@ -16,7 +16,6 @@
 #define CITUS_LOG_LEVEL_OFF 0
 
 
-extern bool IsLoggableLevel(int logLevel);
 extern char * HashLogMessage(const char *text);
 
 #define ApplyLogRedaction(text) \

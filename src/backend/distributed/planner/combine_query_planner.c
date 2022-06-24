@@ -279,7 +279,7 @@ BuildSelectStatementViaStdPlanner(Query *combineQuery, List *remoteScanTargetLis
 	 * cpu intensive we only perform that if we are actually logging DEBUG4.
 	 */
 	const int logCombineQueryLevel = DEBUG4;
-	if (IsLoggableLevel(logCombineQueryLevel))
+	if (message_level_is_interesting(logCombineQueryLevel))
 	{
 		StringInfo queryString = makeStringInfo();
 		pg_get_query_def(combineQuery, queryString);

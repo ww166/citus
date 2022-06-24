@@ -235,7 +235,7 @@ GenerateSubplansForSubqueriesAndCTEs(uint64 planId, Query *originalQuery,
 		RaiseDeferredError(error, ERROR);
 	}
 
-	if (context.subPlanList && IsLoggableLevel(DEBUG1))
+	if (context.subPlanList && message_level_is_interesting(DEBUG1))
 	{
 		StringInfo subPlanString = makeStringInfo();
 		pg_get_query_def(originalQuery, subPlanString);
@@ -756,7 +756,7 @@ RecursivelyPlanCTEs(Query *query, RecursivePlanningContext *planningContext)
 
 		uint32 subPlanId = list_length(planningContext->subPlanList) + 1;
 
-		if (IsLoggableLevel(DEBUG1))
+		if (message_level_is_interesting(DEBUG1))
 		{
 			StringInfo subPlanString = makeStringInfo();
 			pg_get_query_def(subquery, subPlanString);
@@ -1150,7 +1150,7 @@ RecursivelyPlanSubquery(Query *subquery, RecursivePlanningContext *planningConte
 	 * Subquery will go through the standard planner, thus to properly deparse it
 	 * we keep its copy: debugQuery.
 	 */
-	if (IsLoggableLevel(DEBUG1))
+	if (message_level_is_interesting(DEBUG1))
 	{
 		debugQuery = copyObject(subquery);
 	}
@@ -1173,7 +1173,7 @@ RecursivelyPlanSubquery(Query *subquery, RecursivePlanningContext *planningConte
 	 */
 	Query *resultQuery = BuildSubPlanResultQuery(subquery->targetList, NIL, resultId);
 
-	if (IsLoggableLevel(DEBUG1))
+	if (message_level_is_interesting(DEBUG1))
 	{
 		StringInfo subqueryString = makeStringInfo();
 
@@ -1419,7 +1419,7 @@ ReplaceRTERelationWithRteSubquery(RangeTblEntry *rangeTableEntry,
 	 */
 	rangeTableEntry->inh = false;
 
-	if (IsLoggableLevel(DEBUG1))
+	if (message_level_is_interesting(DEBUG1))
 	{
 		char *relationAndAliasName = GetRelationNameAndAliasName(rangeTableEntry);
 		ereport(DEBUG1, (errmsg("Wrapping relation %s to a subquery",

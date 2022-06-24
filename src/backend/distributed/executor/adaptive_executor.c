@@ -4976,7 +4976,7 @@ PlacementExecutionDone(TaskPlacementExecution *placementExecution, bool succeede
 		workerPool->totalTaskExecutionTime += durationMicrosecs;
 		workerPool->totalExecutedTasks += 1;
 
-		if (IsLoggableLevel(DEBUG4))
+		if (message_level_is_interesting(DEBUG4))
 		{
 			ereport(DEBUG4, (errmsg("task execution (%d) for placement (%ld) on anchor "
 									"shard (%ld) finished in %ld microseconds on worker "
