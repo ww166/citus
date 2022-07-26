@@ -1791,6 +1791,75 @@ RecordDistributedRelationDependencies(Oid distributedRelationId)
 
 
 /*
+ * UpdateShardRange sets the shardminvalue and shardmaxvalue of the given
+ * shard.
+ */
+void
+UpdateShardRange(uint64 shardId, text *shardMinValue, text *shardMaxValue)
+{
+	Relation pgDistShard = table_open(DistShardRelationId(), RowExclusiveLock);
+	TupleDesc tupleDescriptor = RelationGetDescr(pgDistShard);
+
+	ScanKeyData scanKey[1];
+	ScanKeyInit(&scanKey[0], Anum_pg_dist_shard_shardid,
+				BTEqualStrategyNumber, F_INT8EQ, Int64GetDatum(shardId));
+
+	bool indexOK = true;
+	int scanKeyCount = 1;
+	SysScanDesc scanDescriptor = systable_beginscan(pgDistShard,
+													DistShardShardidIndexId(),
+													indexOK,
+													NULL, scanKeyCount, scanKey);
+
+	HeapTuple heapTuple = systable_getnext(scanDescriptor);
+	if (!HeapTupleIsValid(heapTuple))
+	{
+		ereport(ERROR, (errmsg("could not find valid entry for shard "
+							   UINT64_FORMAT,
+							   shardId)));
+	}
+
+	Datum values[Natts_pg_dist_shard];
+	bool isnull[Natts_pg_dist_shard];
+	bool replace[Natts_pg_dist_shard];
+
+	/* set the shardminvalue and shardmaxvalue */
+	memset(replace, 0, sizeof(replace));
+	replace[Anum_pg_dist_shard_shardminvalue - 1] = true;
+	replace[Anum_pg_dist_shard_shardmaxvalue - 1] = true;
+
+	if (shardMinValue != NULL)
+	{
+		values[Anum_pg_dist_shard_shardminvalue - 1] = PointerGetDatum(shardMinValue);
+		isnull[Anum_pg_dist_shard_shardminvalue - 1] = false;
+	}
+	else
+	{
+		isnull[Anum_pg_dist_shard_shardminvalue - 1] = true;
+	}
+
+	if (shardMinValue != NULL)
+	{
+		values[Anum_pg_dist_shard_shardmaxvalue - 1] = PointerGetDatum(shardMaxValue);
+		isnull[Anum_pg_dist_shard_shardmaxvalue - 1] = false;
+	}
+	else
+	{
+		isnull[Anum_pg_dist_shard_shardmaxvalue - 1] = true;
+	}
+
+	heapTuple = heap_modify_tuple(heapTuple, tupleDescriptor, values, isnull, replace);
+
+	CatalogTupleUpdate(pgDistShard, &heapTuple->t_self, heapTuple);
+	CitusInvalidateRelcacheByShardId(shardId);
+	CommandCounterIncrement();
+
+	systable_endscan(scanDescriptor);
+	table_close(pgDistShard, NoLock);
+}
+
+
+/*
  * DeletePartitionRow removes the row from pg_dist_partition where the logicalrelid
  * field equals to distributedRelationId. Then, the function invalidates the
  * metadata cache.

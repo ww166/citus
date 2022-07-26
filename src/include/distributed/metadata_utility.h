@@ -248,6 +248,7 @@ extern void InsertIntoPgDistPartition(Oid relationId, char distributionMethod,
 extern void UpdatePgDistPartitionAutoConverted(Oid citusTableId, bool autoConverted);
 extern void DeletePartitionRow(Oid distributedRelationId);
 extern void DeleteShardRow(uint64 shardId);
+extern void UpdateShardRange(uint64 shardId, text *shardMinValue, text *shardMaxValue);
 extern void UpdateShardPlacementState(uint64 placementId, char shardState);
 extern void UpdatePlacementGroupId(uint64 placementId, int groupId);
 extern void DeleteShardPlacementRow(uint64 placementId);

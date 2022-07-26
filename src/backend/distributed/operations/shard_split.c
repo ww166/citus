@@ -78,6 +78,7 @@ static void DoSplitCopy(WorkerNode *sourceShardNode,
 						List *shardGroupSplitIntervalListList,
 						List *workersForPlacementList);
 static StringInfo CreateSplitCopyCommand(ShardInterval *sourceShardSplitInterval,
+										 char *partitionColumnName,
 										 List *splitChildrenShardIntervalList,
 										 List *workersForPlacementList);
 static void InsertSplitChildrenShardMetadata(List *shardGroupSplitIntervalListList,
@@ -707,8 +708,24 @@ DoSplitCopy(WorkerNode *sourceShardNode, List *sourceColocatedShardIntervalList,
 		 */
 		if (!PartitionedTable(sourceShardIntervalToCopy->relationId))
 		{
+			Oid relationId = sourceShardIntervalToCopy->relationId;
+
+			/*
+			 * We pass down the partition column to worker_split_copy to avoid
+			 * depending on the metadata, which allows us to split Citus local
+			 * tables.
+			 */
+			Var *partitionColumn =
+				DistPartitionKey(relationId);
+
+			bool missingOK = false;
+			char *partitionColumnName = get_attname(relationId,
+													partitionColumn->varattno,
+													missingOK);
+
 			StringInfo splitCopyUdfCommand = CreateSplitCopyCommand(
 				sourceShardIntervalToCopy,
+				partitionColumnName,
 				splitShardIntervalList,
 				destinationWorkerNodesList);
 
@@ -758,6 +775,7 @@ DoSplitCopy(WorkerNode *sourceShardNode, List *sourceColocatedShardIntervalList,
  */
 static StringInfo
 CreateSplitCopyCommand(ShardInterval *sourceShardSplitInterval,
+					   char *partitionColumnName,
 					   List *splitChildrenShardIntervalList,
 					   List *destinationWorkerNodesList)
 {
@@ -789,8 +807,9 @@ CreateSplitCopyCommand(ShardInterval *sourceShardSplitInterval,
 	appendStringInfo(splitCopyInfoArray, "]");
 
 	StringInfo splitCopyUdf = makeStringInfo();
-	appendStringInfo(splitCopyUdf, "SELECT pg_catalog.worker_split_copy(%lu, %s);",
+	appendStringInfo(splitCopyUdf, "SELECT pg_catalog.worker_split_copy(%lu, %s, %s);",
 					 sourceShardSplitInterval->shardId,
+					 quote_literal_cstr(partitionColumnName),
 					 splitCopyInfoArray->data);
 
 	return splitCopyUdf;
