@@ -415,16 +415,19 @@ char *
 DropExistingIfAnyAndCreateTemplateReplicationSlot(ShardInterval *shardIntervalToSplit,
 												  MultiConnection *sourceConnection)
 {
+	int response = 0;
+	PGresult *result = NULL;
+
 	/*
 	 * To ensure SPLIT is idempotent drop any existing slot from
 	 * previous failed operation.
 	 */
+/*
 	StringInfo dropReplicationSlotCommand = makeStringInfo();
 	appendStringInfo(dropReplicationSlotCommand, "SELECT pg_drop_replication_slot('%s')",
 					 ShardSplitTemplateReplicationSlotName(
 						 shardIntervalToSplit->shardId));
 
-	/* The Drop command can fail so ignore the response / result and proceed anyways */
 	PGresult *result = NULL;
 	int response = ExecuteOptionalRemoteCommand(sourceConnection,
 												dropReplicationSlotCommand->data,
@@ -432,6 +435,7 @@ DropExistingIfAnyAndCreateTemplateReplicationSlot(ShardInterval *shardIntervalTo
 
 	PQclear(result);
 	ForgetResults(sourceConnection);
+*/
 
 	/*
 	 * Note: Temporary slot are only live during the session's lifetime causing them to be dropped when the session ends.

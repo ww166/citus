@@ -26,7 +26,8 @@ typedef enum SplitMode
 typedef enum SplitOperation
 {
 	SHARD_SPLIT_API = 0,
-	ISOLATE_TENANT_TO_NEW_SHARD
+	ISOLATE_TENANT_TO_NEW_SHARD,
+	CREATE_DISTRIBUTED_TABLE
 } SplitOperation;
 
 /*
@@ -55,6 +56,13 @@ extern void SplitShard(SplitMode splitMode,
 					   uint64 shardIdToSplit,
 					   List *shardSplitPointsList,
 					   List *nodeIdsForPlacementList);
+extern void NonBlockingShardSplit(SplitOperation splitOperation,
+								  ShardInterval *shardIntervalToSplit,
+								  List *shardSplitPointsList,
+								  List *workersForPlacementList,
+								  char *snapshotName);
+extern char * CreateTemplateReplicationSlotAndReturnSnapshot(ShardInterval *shardInterval,
+															 WorkerNode *sourceWorkerNode);
 
 /* TODO(niupre): Make all these APIs private when all consumers (Example : ISOLATE_TENANT_TO_NEW_SHARD) directly call 'SplitShard' API. */
 extern void ErrorIfCannotSplitShard(SplitOperation splitOperation,

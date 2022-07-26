@@ -109,8 +109,8 @@ static char DecideReplicationModel(char distributionMethod, char *colocateWithTa
 								   bool viaDeprecatedAPI);
 static List * HashSplitPointsForShardList(List *shardList);
 static List * HashSplitPointsForShardCount(int shardCount);
-static List * NodeIdsForShardList(List *shardList);
-static List * RoundRobinNodeIdList(List *workerNodeList, int listLength);
+static List * WorkerNodesForShardList(List *shardList);
+static List * RoundRobinWorkerNodeList(List *workerNodeList, int listLength);
 static void CreateHashDistributedTableShards(Oid relationId, int shardCount,
 											 Oid colocatedTableId, bool localTableEmpty);
 static uint32 ColocationIdForNewTable(Oid relationId, Var *distributionColumn,
@@ -411,8 +411,19 @@ CreateDistributedTableConcurrently(Oid relationId, char *distributionColumnName,
 	 * target distribution.
 	 */
 	ShardInterval *shardToSplit = (ShardInterval *) linitial(shardIdList);
+	WorkerNode *localNode = ActiveShardPlacementWorkerNode(shardToSplit->shardId);
 
 	PropagatePrerequisiteObjectsForDistributedTable(relationId);
+
+	/*
+	 * Before making any local changes, create the replication slot.
+	 *
+	 * It returns a snapshot. The snapshot remains valid till the lifetime of
+	 * the session that creates it. The connection is closed
+	 * at the end of the transaction.
+	 */
+	char *snapshotName =
+		CreateTemplateReplicationSlotAndReturnSnapshot(shardToSplit, localNode);
 
 	/*
 	 * Delete Citus local table record before DecideColocationProperties inserts
@@ -474,7 +485,7 @@ CreateDistributedTableConcurrently(Oid relationId, char *distributionColumnName,
 		}
 	}
 
-	List *nodeIdsForSplitPlacements;
+	List *workersForPlacementList;
 	List *shardSplitPointsList;
 
 	Oid colocatedTableId = ColocatedTableId(colocationId);
@@ -491,7 +502,7 @@ CreateDistributedTableConcurrently(Oid relationId, char *distributionColumnName,
 		/*
 		 * Find the node IDs of the shard placements.
 		 */
-		nodeIdsForSplitPlacements = NodeIdsForShardList(colocatedShardList);
+		workersForPlacementList = WorkerNodesForShardList(colocatedShardList);
 	}
 	else
 	{
@@ -504,20 +515,17 @@ CreateDistributedTableConcurrently(Oid relationId, char *distributionColumnName,
 		 * Place shards in a round-robin fashion across all data nodes.
 		 */
 		List *workerNodeList = DistributedTablePlacementNodeList(NoLock);
-		nodeIdsForSplitPlacements = RoundRobinNodeIdList(workerNodeList, shardCount);
+		workersForPlacementList = RoundRobinWorkerNodeList(workerNodeList, shardCount);
 	}
 
-	/*
-	 * TODO: change to non-blocking
-	 */
-	SplitMode shardSplitMode = BLOCKING_SPLIT;
+	SplitOperation splitOperation = CREATE_DISTRIBUTED_TABLE;
 
-	SplitShard(
-		shardSplitMode,
-		SHARD_SPLIT_API,
-		shardToSplit->shardId,
+	NonBlockingShardSplit(
+		splitOperation,
+		shardToSplit,
 		shardSplitPointsList,
-		nodeIdsForSplitPlacements);
+		workersForPlacementList,
+		snapshotName);
 }
 
 
@@ -578,52 +586,44 @@ HashSplitPointsForShardCount(int shardCount)
 
 
 /*
- * NodeIdsForShardList returns a list of node IDs reflecting the locations of
+ * WorkerNodesForShardList returns a list of nodes reflecting the locations of
  * the given list of shards.
  */
 static List *
-NodeIdsForShardList(List *shardList)
+WorkerNodesForShardList(List *shardList)
 {
-	List *nodeIdList = NIL;
+	List *nodeList = NIL;
 
 	ShardInterval *shardInterval = NULL;
 	foreach_ptr(shardInterval, shardList)
 	{
-		List *placementList = ActiveShardPlacementList(shardInterval->shardId);
+		WorkerNode *workerNode = ActiveShardPlacementWorkerNode(shardInterval->shardId);
 
-		if (list_length(placementList) != 1)
-		{
-			ereport(ERROR, (errmsg("cannot create_distributed_table concurrently "
-								   "when shards are replicated")));
-		}
-
-		ShardPlacement *placement = (ShardPlacement *) linitial(placementList);
-
-		nodeIdList = lappend_int(nodeIdList, placement->nodeId);
+		nodeList = lappend(nodeList, workerNode);
 	}
 
-	return nodeIdList;
+	return nodeList;
 }
 
 
 /*
- * RoundRobinNodeIdList round robins over the workers in the worker node list
- * and adds a node ID to a list of length listLength.
+ * RoundRobinWorkerNodeList round robins over the workers in the worker node list
+ * and adds nodes to a list of length listLength.
  */
 static List *
-RoundRobinNodeIdList(List *workerNodeList, int listLength)
+RoundRobinWorkerNodeList(List *workerNodeList, int listLength)
 {
-	List *nodeIdList = NIL;
+	List *nodeList = NIL;
 
 	for (int nodeIdIndex = 0; nodeIdIndex < listLength; nodeIdIndex++)
 	{
 		int nodeIndex = nodeIdIndex % list_length(workerNodeList);
 		WorkerNode *workerNode = (WorkerNode *) list_nth(workerNodeList, nodeIndex);
 
-		nodeIdList = lappend_int(nodeIdList, workerNode->nodeId);
+		nodeList = lappend(nodeList, workerNode);
 	}
 
-	return nodeIdList;
+	return nodeList;
 }
 
 
@@ -1088,7 +1088,7 @@ DecideColocationProperties(Oid relationId, char *distributionColumnName,
 
 	Var *distributionColumn = BuildDistributionKeyFromColumnName(relationId,
 																 distributionColumnName,
-																 ExclusiveLock);
+																 NoLock);
 
 	/*
 	 * ColocationIdForNewTable assumes caller acquires lock on relationId. In our case,

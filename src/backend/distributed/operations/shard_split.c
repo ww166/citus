@@ -81,10 +81,6 @@ static void BlockingShardSplit(SplitOperation splitOperation,
 							   ShardInterval *shardIntervalToSplit,
 							   List *shardSplitPointsList,
 							   List *workersForPlacementList);
-static void NonBlockingShardSplit(SplitOperation splitOperation,
-								  ShardInterval *shardIntervalToSplit,
-								  List *shardSplitPointsList,
-								  List *workersForPlacementList);
 
 static void DoSplitCopy(WorkerNode *sourceShardNode,
 						List *sourceColocatedShardIntervalList,
@@ -108,10 +104,6 @@ static Task * CreateTaskForDDLCommandList(List *ddlCommandList, WorkerNode *work
 static StringInfo CreateSplitShardReplicationSetupUDF(
 	List *sourceColocatedShardIntervalList, List *shardGroupSplitIntervalListList,
 	List *destinationWorkerNodesList);
-static char * CreateTemplateReplicationSlotAndReturnSnapshot(ShardInterval *shardInterval,
-															 WorkerNode *sourceWorkerNode,
-															 MultiConnection **
-															 templateSlotConnection);
 static List * ParseReplicationSlotInfoFromResult(PGresult *result);
 
 static List * ExecuteSplitShardReplicationSetupUDF(WorkerNode *sourceWorkerNode,
@@ -128,11 +120,13 @@ static const char *const SplitOperationName[] =
 {
 	[SHARD_SPLIT_API] = "split",
 	[ISOLATE_TENANT_TO_NEW_SHARD] = "isolate",
+	[CREATE_DISTRIBUTED_TABLE] = "distribute",
 };
 static const char *const SplitTargetName[] =
 {
 	[SHARD_SPLIT_API] = "shard",
 	[ISOLATE_TENANT_TO_NEW_SHARD] = "tenant",
+	[CREATE_DISTRIBUTED_TABLE] = "shard",
 };
 
 /* Map containing list of dummy shards created on target nodes */
@@ -423,12 +417,24 @@ SplitShard(SplitMode splitMode,
 	}
 	else
 	{
+		WorkerNode *sourceShardToCopyNode =
+			ActiveShardPlacementWorkerNode(shardIntervalToSplit->shardId);
+
+		/*
+		 * Create template replication Slot. It returns a snapshot. The snapshot remains
+		 * valid till the lifetime of the session that creates it. The connection is closed
+		 * at the end of the transaction.
+		 */
+		char *snapshotName = CreateTemplateReplicationSlotAndReturnSnapshot(
+			shardIntervalToSplit, sourceShardToCopyNode);
+
 		/*TODO(saawasek): Discussing about existing bug with the assumption of move shard*/
 		NonBlockingShardSplit(
 			splitOperation,
 			shardIntervalToSplit,
 			shardSplitPointsList,
-			workersForPlacementList);
+			workersForPlacementList,
+			snapshotName);
 	}
 }
 
@@ -521,14 +527,8 @@ BlockingShardSplit(SplitOperation splitOperation,
 		sourceColocatedShardIntervalList,
 		shardSplitPointsList);
 
-	/* Only single placement allowed (already validated RelationReplicationFactor = 1) */
-	List *sourcePlacementList = ActiveShardPlacementList(shardIntervalToSplit->shardId);
-	Assert(sourcePlacementList->length == 1);
-	ShardPlacement *sourceShardPlacement = (ShardPlacement *) linitial(
-		sourcePlacementList);
-	WorkerNode *sourceShardToCopyNode = FindNodeWithNodeId(sourceShardPlacement->nodeId,
-														   false /* missingOk */);
-
+	WorkerNode *sourceShardToCopyNode =
+		ActiveShardPlacementWorkerNode(shardIntervalToSplit->shardId);
 
 	HTAB *mapOfShardToPlacementCreatedByWorkflow =
 		CreateEmptyMapForShardsCreatedByWorkflow();
@@ -764,13 +764,11 @@ DoSplitCopy(WorkerNode *sourceShardNode, List *sourceColocatedShardIntervalList,
 			 * depending on the metadata, which allows us to split Citus local
 			 * tables.
 			 */
-			Var *partitionColumn =
-				DistPartitionKey(relationId);
+			Var *partitionColumn = DistPartitionKey(relationId);
 
 			bool missingOK = false;
-			char *partitionColumnName = get_attname(relationId,
-													partitionColumn->varattno,
-													missingOK);
+			char *partitionColumnName =
+				get_attname(relationId, partitionColumn->varattno, missingOK);
 
 			StringInfo splitCopyUdfCommand = CreateSplitCopyCommand(
 				sourceShardIntervalToCopy,
@@ -1249,12 +1247,14 @@ TryDropSplitShardsOnFailure(HTAB *mapOfShardToPlacementCreatedByWorkflow)
  * 'shardIntervalToSplit'       : Source shard interval to be split.
  * 'shardSplitPointsList'		: Split Points list for the source 'shardInterval'.
  * 'workersForPlacementList'	: Placement list corresponding to split children.
+ * 'snapshotName'               : Snapshot of the replication slot
  */
-static void
+void
 NonBlockingShardSplit(SplitOperation splitOperation,
 					  ShardInterval *shardIntervalToSplit,
 					  List *shardSplitPointsList,
-					  List *workersForPlacementList)
+					  List *workersForPlacementList,
+					  char *snapshotName)
 {
 	char *superUser = CitusExtensionOwnerName();
 	char *databaseName = get_database_name(MyDatabaseId);
@@ -1268,13 +1268,8 @@ NonBlockingShardSplit(SplitOperation splitOperation,
 		sourceColocatedShardIntervalList,
 		shardSplitPointsList);
 
-	/* Only single placement allowed (already validated RelationReplicationFactor = 1) */
-	List *sourcePlacementList = ActiveShardPlacementList(shardIntervalToSplit->shardId);
-	Assert(sourcePlacementList->length == 1);
-	ShardPlacement *sourceShardPlacement = (ShardPlacement *) linitial(
-		sourcePlacementList);
-	WorkerNode *sourceShardToCopyNode = FindNodeWithNodeId(sourceShardPlacement->nodeId,
-														   false /* missingOk */);
+	WorkerNode *sourceShardToCopyNode =
+		ActiveShardPlacementWorkerNode(shardIntervalToSplit->shardId);
 
 	/* Create hashmap to group shards for publication-subscription management */
 	HTAB *shardSplitHashMapForPublication = CreateShardSplitInfoMapForPublication(
@@ -1282,7 +1277,11 @@ NonBlockingShardSplit(SplitOperation splitOperation,
 		shardGroupSplitIntervalListList,
 		workersForPlacementList);
 
-	DropAllShardSplitLeftOvers(sourceShardToCopyNode, shardSplitHashMapForPublication);
+	/*
+	 * TODO: temporarily disabled, because it conflicts with creating replication
+	 * slots in create_distributed_table_concurrently
+	 */
+	//DropAllShardSplitLeftOvers(sourceShardToCopyNode, shardSplitHashMapForPublication);
 
 	MultiConnection *sourceConnection = GetNodeUserDatabaseConnection(connectionFlags,
 																	  sourceShardToCopyNode
@@ -1320,20 +1319,10 @@ NonBlockingShardSplit(SplitOperation splitOperation,
 		/* 3) Create Publications. */
 		CreateShardSplitPublications(sourceConnection, shardSplitHashMapForPublication);
 
-		/*
-		 * 4) Create template replication Slot. It returns a snapshot. The snapshot remains
-		 * valid till the lifetime of the session that creates it. The connection is closed
-		 * at the end of the workflow.
-		 */
-		MultiConnection *templateSlotConnection = NULL;
-		char *snapShotName = CreateTemplateReplicationSlotAndReturnSnapshot(
-			shardIntervalToSplit, sourceShardToCopyNode, &templateSlotConnection);
-
-
 		/* 5) Do snapshotted Copy */
 		DoSplitCopy(sourceShardToCopyNode, sourceColocatedShardIntervalList,
 					shardGroupSplitIntervalListList, workersForPlacementList,
-					snapShotName);
+					snapshotName);
 
 		/* 6) Execute 'worker_split_shard_replication_setup UDF */
 		List *replicationSlotInfoList = ExecuteSplitShardReplicationSetupUDF(
@@ -1432,9 +1421,6 @@ NonBlockingShardSplit(SplitOperation splitOperation,
 
 		/* 23) Close all subscriber connections */
 		CloseShardSplitSubscriberConnections(shardSplitSubscribersMetadataList);
-
-		/* 24) Close connection of template replication slot */
-		CloseConnection(templateSlotConnection);
 	}
 	PG_CATCH();
 	{
@@ -1597,8 +1583,7 @@ CreateWorkerForPlacementSet(List *workersForPlacementList)
  */
 char *
 CreateTemplateReplicationSlotAndReturnSnapshot(ShardInterval *shardInterval,
-											   WorkerNode *sourceWorkerNode,
-											   MultiConnection **templateSlotConnection)
+											   WorkerNode *sourceWorkerNode)
 {
 	/*Create Template replication slot */
 	int connectionFlags = FORCE_NEW_CONNECTION;
@@ -1612,7 +1597,6 @@ CreateTemplateReplicationSlotAndReturnSnapshot(ShardInterval *shardInterval,
 																	  CitusExtensionOwnerName(),
 																	  get_database_name(
 																		  MyDatabaseId));
-	ClaimConnectionExclusively(sourceConnection);
 
 	/*
 	 * Try to drop leftover template replication slot if any from previous operation
@@ -1620,8 +1604,6 @@ CreateTemplateReplicationSlotAndReturnSnapshot(ShardInterval *shardInterval,
 	 */
 	char *snapShotName = DropExistingIfAnyAndCreateTemplateReplicationSlot(shardInterval,
 																		   sourceConnection);
-	*templateSlotConnection = sourceConnection;
-
 	return snapShotName;
 }
 
@@ -1721,6 +1703,12 @@ CreateSplitShardReplicationSetupUDF(List *sourceColocatedShardIntervalList,
 				splitChildShardIntervalList, shardGroupSplitIntervalListList)
 	{
 		int64 sourceShardId = sourceShardIntervalToCopy->shardId;
+		Oid relationId = sourceShardIntervalToCopy->relationId;
+		Var *partitionColumn = DistPartitionKey(relationId);
+
+		bool missingOK = false;
+		char *partitionColumnName =
+			get_attname(relationId, partitionColumn->varattno, missingOK);
 
 		ShardInterval *splitChildShardInterval = NULL;
 		WorkerNode *destinationWorkerNode = NULL;
@@ -1741,8 +1729,9 @@ CreateSplitShardReplicationSetupUDF(List *sourceColocatedShardIntervalList,
 								 splitChildShardInterval->maxValue));
 
 			appendStringInfo(splitChildrenRows,
-							 "ROW(%lu, %lu, %s, %s, %u)::citus.split_shard_info",
+							 "ROW(%lu, %s, %lu, %s, %s, %u)::citus.split_shard_info",
 							 sourceShardId,
+							 quote_literal_cstr(partitionColumnName),
 							 splitChildShardInterval->shardId,
 							 quote_literal_cstr(minValueString->data),
 							 quote_literal_cstr(maxValueString->data),
