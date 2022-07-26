@@ -81,3 +81,4 @@ DROP FUNCTION pg_catalog.get_all_active_transactions(OUT datid oid, OUT process_
 
 DROP VIEW pg_catalog.citus_locks;
 DROP FUNCTION pg_catalog.citus_locks();
+DROP FUNCTION pg_catalog.create_distributed_table_cocnurrently;
