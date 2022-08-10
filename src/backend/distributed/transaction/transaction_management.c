@@ -628,16 +628,25 @@ CoordinatedSubTransactionCallback(SubXactEvent event, SubTransactionId subId,
 		 */
 		case SUBXACT_EVENT_START_SUB:
 		{
+            MemoryContext previousContext = CurrentMemoryContext;
+			MemoryContextSwitchTo(CitusXactCallbackContext);
+
 			PushSubXact(subId);
 			if (InCoordinatedTransaction())
 			{
 				CoordinatedRemoteTransactionsSavepointBegin(subId);
 			}
+
+            MemoryContextSwitchTo(previousContext);
+
 			break;
 		}
 
 		case SUBXACT_EVENT_COMMIT_SUB:
 		{
+            MemoryContext previousContext = CurrentMemoryContext;
+			MemoryContextSwitchTo(CitusXactCallbackContext);
+
 			if (InCoordinatedTransaction())
 			{
 				CoordinatedRemoteTransactionsSavepointRelease(subId);
@@ -650,11 +659,17 @@ CoordinatedSubTransactionCallback(SubXactEvent event, SubTransactionId subId,
 			{
 				SetCreateCitusTransactionLevel(GetCitusCreationLevel() - 1);
 			}
+
+            MemoryContextSwitchTo(previousContext);
+
 			break;
 		}
 
 		case SUBXACT_EVENT_ABORT_SUB:
 		{
+            MemoryContext previousContext = CurrentMemoryContext;
+			MemoryContextSwitchTo(CitusXactCallbackContext);
+
 			/*
 			 * Stop showing message for now, will re-enable when executing
 			 * the next statement.
@@ -682,6 +697,9 @@ CoordinatedSubTransactionCallback(SubXactEvent event, SubTransactionId subId,
 				InvalidateMetadataSystemCache();
 				SetCreateCitusTransactionLevel(0);
 			}
+
+            MemoryContextSwitchTo(previousContext);
+
 			break;
 		}
 
@@ -729,27 +747,6 @@ AdjustMaxPreparedTransactions(void)
 static void
 PushSubXact(SubTransactionId subId)
 {
-	/*
-	 * We need to allocate these in a long-living memory context instead of
-	 * current subxact's memory context. This is because AtSubCommit_Memory
-	 * won't delete the subxact's memory context unless it is empty, and this
-	 * can cause in memory leaks. For emptiness it just checks if the memory
-	 * has been reset, and we cannot reset the subxact context since other
-	 * data can be in the context that are needed by upper commits.
-	 *
-	 * See https://github.com/citusdata/citus/issues/3999
-	 *
-	 * Also, any memory error that we might encounter here might leave
-	 * activeSubXactContexts in an inconsistent state and this might result in
-	 * a SIGSEGV when freeing the memory at PopSubXact(). For this reason, here
-	 * we use CitusXactCallbackContext --instead of other kind of long living
-	 * memory contexts such as TopTransactionContext-- to avoid doing a malloc()
-	 * call implicitly
-	 *
-	 * See https://github.com/citusdata/citus/issues/5000
-	 */
-	MemoryContext old_context = MemoryContextSwitchTo(CitusXactCallbackContext);
-
 	/* save provided subId as well as propagated SET LOCAL stmts */
 	SubXactContext *state = palloc(sizeof(SubXactContext));
 	state->subId = subId;
@@ -758,8 +755,6 @@ PushSubXact(SubTransactionId subId)
 	/* append to list and reset active set stmts for upcoming sub-xact */
 	activeSubXactContexts = lcons(state, activeSubXactContexts);
 	activeSetStmts = makeStringInfo();
-
-	MemoryContextSwitchTo(old_context);
 }
 
 
