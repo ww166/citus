@@ -701,11 +701,7 @@ InitializeBackendData(const char *applicationName)
 	/* zero out the backend its transaction id */
 	UnSetDistributedTransactionId();
 	UnSetGlobalPID();
-
-	SpinLockAcquire(&MyBackendData->mutex);
-	MyBackendData->distributedCommandOriginator = IsExternalClientBackend();
-	MyBackendData->globalPID = gpid;
-	SpinLockRelease(&MyBackendData->mutex);
+	SetGlobalPID(gpid);
 
 	/*
 	 * Signal that this backend is active and should show up
@@ -737,6 +733,43 @@ UnSetDistributedTransactionId(void)
 
 		SpinLockRelease(&MyBackendData->mutex);
 	}
+}
+
+
+/*
+ * SetGlobalPID sets the global PID. This specifically does not read from
+ * catalog tables, because it should be safe to run from our
+ * ApplicationNameAssignHook function.
+ */
+void
+SetGlobalPID(uint64 globalPID)
+{
+	if (!MyBackendData)
+	{
+		return;
+	}
+
+	SpinLockAcquire(&MyBackendData->mutex);
+
+	/*
+	 * If the globalPID is invalid we don't reset it and keep the old one
+	 * instead. When initializing the connection this is fine, because the
+	 * default is INVALID_CITUS_INTERNAL_BACKEND_GPID. But when calling it from
+	 * the ApplicationNameAssignHook, we don't want a detected gpid to be
+	 * cleared if the application name changes to an application_name without a
+	 * gpid (such as citus_rebalancer).
+	 */
+	if (globalPID == INVALID_CITUS_INTERNAL_BACKEND_GPID)
+	{
+		MyBackendData->distributedCommandOriginator = IsExternalClientBackend();
+	}
+	else
+	{
+		MyBackendData->globalPID = globalPID;
+		MyBackendData->distributedCommandOriginator = false;
+	}
+
+	SpinLockRelease(&MyBackendData->mutex);
 }
 
 
@@ -1359,16 +1392,6 @@ void
 DecrementExternalClientBackendCounter(void)
 {
 	pg_atomic_sub_fetch_u32(&backendManagementShmemData->externalClientBackendCounter, 1);
-}
-
-
-/*
- * ResetCitusBackendType resets the backend type cache.
- */
-void
-ResetCitusBackendType(void)
-{
-	CurrentBackendType = CITUS_BACKEND_NOT_ASSIGNED;
 }
 
 

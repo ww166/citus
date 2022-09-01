@@ -55,6 +55,7 @@ extern void LockBackendSharedMemory(LWLockMode lockMode);
 extern void UnlockBackendSharedMemory(void);
 extern void UnSetDistributedTransactionId(void);
 extern void UnSetGlobalPID(void);
+extern void SetGlobalPID(uint64 globalPID);
 extern void SetActiveMyBackend(bool value);
 extern void AssignDistributedTransactionId(void);
 extern void AssignGlobalPID(void);
@@ -79,7 +80,6 @@ extern bool IsCitusInternalBackend(void);
 extern bool IsRebalancerInternalBackend(void);
 extern bool IsCitusRunCommandBackend(void);
 extern bool IsExternalClientBackend(void);
-extern void ResetCitusBackendType(void);
 
 #define INVALID_CITUS_INTERNAL_BACKEND_GPID 0
 #define GLOBAL_PID_NODE_ID_FOR_NODES_NOT_IN_METADATA 99999999
