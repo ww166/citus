@@ -134,7 +134,8 @@ static List * PostLoadShardCreationCommandList(ShardInterval *shardInterval,
 											   int32 sourceNodePort);
 static ShardCommandList * CreateShardCommandList(ShardInterval *shardInterval,
 												 List *ddlCommandList);
-static char * CreateShardCopyCommand(ShardInterval *shard, WorkerNode *targetNode);
+static char * CreateShardCopyCommand(ShardInterval *shard, WorkerNode *targetNode,
+									 bool isSameNode);
 
 
 /* declarations for dynamic loading */
@@ -1389,8 +1390,10 @@ CopyShardsToNode(WorkerNode *sourceNode, WorkerNode *targetNode, List *shardInte
 			ddlCommandList = lappend(ddlCommandList, snapShotString->data);
 		}
 
+		bool isSameNode = sourceNode->nodeId == targetNode->nodeId;
+
 		char *copyCommand = CreateShardCopyCommand(
-			shardInterval, targetNode);
+			shardInterval, targetNode, isSameNode);
 
 		ddlCommandList = lappend(ddlCommandList, copyCommand);
 
@@ -1427,14 +1430,18 @@ CopyShardsToNode(WorkerNode *sourceNode, WorkerNode *targetNode, List *shardInte
  */
 static char *
 CreateShardCopyCommand(ShardInterval *shard,
-					   WorkerNode *targetNode)
+					   WorkerNode *targetNode,
+					   bool isSameNode)
 {
 	char *shardName = ConstructQualifiedShardName(shard);
 	StringInfo query = makeStringInfo();
 	appendStringInfo(query,
-					 "SELECT pg_catalog.worker_copy_table_to_node(%s::regclass, %u);",
+					 "SELECT pg_catalog.worker_copy_table_to_node("
+					 "%s::regclass, %s, %d, %s);",
 					 quote_literal_cstr(shardName),
-					 targetNode->nodeId);
+					 quote_literal_cstr(targetNode->workerName),
+					 targetNode->workerPort,
+					 isSameNode ? "true" : "false");
 	return query->data;
 }
 

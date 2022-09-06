@@ -37,7 +37,10 @@ Datum
 worker_copy_table_to_node(PG_FUNCTION_ARGS)
 {
 	Oid relationId = PG_GETARG_OID(0);
-	uint32_t targetNodeId = PG_GETARG_INT32(1);
+	text *targetNodeNameText = PG_GETARG_TEXT_P(1);
+	char *targetNodeName = text_to_cstring(targetNodeNameText);
+	uint32 targetNodePort = PG_GETARG_UINT32(2);
+	bool isLocal = PG_GETARG_BOOL(3);
 
 	Oid schemaOid = get_rel_namespace(relationId);
 	char *relationSchemaName = get_namespace_name(schemaOid);
@@ -50,7 +53,9 @@ worker_copy_table_to_node(PG_FUNCTION_ARGS)
 	DestReceiver *destReceiver = CreateShardCopyDestReceiver(
 		executor,
 		list_make2(relationSchemaName, relationName),
-		targetNodeId);
+		targetNodeName,
+		targetNodePort,
+		isLocal);
 
 	StringInfo selectShardQueryForCopy = makeStringInfo();
 	appendStringInfo(selectShardQueryForCopy,

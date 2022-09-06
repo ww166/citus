@@ -76,7 +76,9 @@ DROP TYPE pg_catalog.split_copy_info;
 
 DROP FUNCTION pg_catalog.worker_copy_table_to_node(
     source_table regclass,
-    target_node_id integer);
+    target_node_name text,
+    target_node_port int,
+    is_local_node bool);
 
 DROP FUNCTION pg_catalog.worker_split_shard_replication_setup(
     splitShardInfo pg_catalog.split_shard_info[]);

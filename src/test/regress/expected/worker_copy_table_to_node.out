@@ -3,8 +3,6 @@ SET search_path TO worker_copy_table_to_node;
 SET citus.shard_count TO 1; -- single shard table for ease of testing
 SET citus.shard_replication_factor TO 1;
 SET citus.next_shard_id TO 62629600;
-SELECT nodeid AS worker_1_node FROM pg_dist_node WHERE nodeport=:worker_1_port \gset
-SELECT nodeid AS worker_2_node FROM pg_dist_node WHERE nodeport=:worker_2_port \gset
 CREATE TABLE t(a int);
 INSERT INTO t SELECT generate_series(1, 100);
 CREATE TABLE ref(a int);
@@ -36,14 +34,14 @@ CREATE TABLE t_62629600(a int);
 \c - - - :worker_1_port
 SET search_path TO worker_copy_table_to_node;
 -- Make sure that the UDF doesn't work on Citus tables
-SELECT worker_copy_table_to_node('t', :worker_1_node);
+SELECT worker_copy_table_to_node('t', 'localhost', :worker_1_port);
 ERROR:  cannot execute a distributed query from a query on a shard
 DETAIL:  Executing a distributed query in a function call that may be pushed to a remote node can lead to incorrect results.
-SELECT worker_copy_table_to_node('ref', :worker_1_node);
+SELECT worker_copy_table_to_node('ref', 'localhost', :worker_1_port);
 ERROR:  cannot execute a distributed query from a query on a shard
 DETAIL:  Executing a distributed query in a function call that may be pushed to a remote node can lead to incorrect results.
 -- It should work on shards
-SELECT worker_copy_table_to_node('t_62629600', :worker_1_node);
+SELECT worker_copy_table_to_node('t_62629600', 'localhost', :worker_1_port, true);
  worker_copy_table_to_node
 ---------------------------------------------------------------------
 
@@ -61,7 +59,7 @@ SELECT count(*) FROM t_62629600;
    200
 (1 row)
 
-SELECT worker_copy_table_to_node('t_62629600', :worker_2_node);
+SELECT worker_copy_table_to_node('t_62629600', 'localhost', :worker_2_port);
  worker_copy_table_to_node
 ---------------------------------------------------------------------
 

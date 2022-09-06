@@ -217,10 +217,19 @@ CreateShardCopyDestReceivers(EState *estate, ShardInterval *shardIntervalToSplit
 		char *destinationShardNameCopy = pstrdup(sourceShardNamePrefix);
 		AppendShardIdToName(&destinationShardNameCopy, splitCopyInfo->destinationShardId);
 
+		int destinationNodeId = splitCopyInfo->destinationShardNodeId;
+		bool isLocalNode = GetLocalNodeId() == destinationNodeId;
+
+		/* worker_split_copy assumes pg_dist_node metadata is available */
+		bool missingOk = false;
+		WorkerNode *workerNode = FindNodeWithNodeId(destinationNodeId, missingOk);
+
 		DestReceiver *shardCopyDest = CreateShardCopyDestReceiver(
 			estate,
 			list_make2(destinationShardSchemaName, destinationShardNameCopy),
-			splitCopyInfo->destinationShardNodeId);
+			workerNode->workerName,
+			workerNode->workerPort,
+			isLocalNode);
 
 		shardCopyDests[index] = shardCopyDest;
 		index++;

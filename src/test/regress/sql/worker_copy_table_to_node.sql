@@ -4,9 +4,6 @@ SET citus.shard_count TO 1; -- single shard table for ease of testing
 SET citus.shard_replication_factor TO 1;
 SET citus.next_shard_id TO 62629600;
 
-SELECT nodeid AS worker_1_node FROM pg_dist_node WHERE nodeport=:worker_1_port \gset
-SELECT nodeid AS worker_2_node FROM pg_dist_node WHERE nodeport=:worker_2_port \gset
-
 CREATE TABLE t(a int);
 INSERT INTO t SELECT generate_series(1, 100);
 
@@ -26,16 +23,16 @@ CREATE TABLE t_62629600(a int);
 SET search_path TO worker_copy_table_to_node;
 
 -- Make sure that the UDF doesn't work on Citus tables
-SELECT worker_copy_table_to_node('t', :worker_1_node);
-SELECT worker_copy_table_to_node('ref', :worker_1_node);
+SELECT worker_copy_table_to_node('t', 'localhost', :worker_1_port);
+SELECT worker_copy_table_to_node('ref', 'localhost', :worker_1_port);
 
 -- It should work on shards
-SELECT worker_copy_table_to_node('t_62629600', :worker_1_node);
+SELECT worker_copy_table_to_node('t_62629600', 'localhost', :worker_1_port, true);
 
 SELECT count(*) FROM t;
 SELECT count(*) FROM t_62629600;
 
-SELECT worker_copy_table_to_node('t_62629600', :worker_2_node);
+SELECT worker_copy_table_to_node('t_62629600', 'localhost', :worker_2_port);
 
 \c - - - :worker_2_port
 SET search_path TO worker_copy_table_to_node;

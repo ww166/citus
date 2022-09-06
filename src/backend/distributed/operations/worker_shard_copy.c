@@ -50,8 +50,9 @@ typedef struct ShardCopyDestReceiver
 	/* number of tuples sent */
 	int64 tuplesSent;
 
-	/* destination node id */
-	uint32_t destinationNodeId;
+	/* destination node */
+	char *destinationNodeName;
+	int destinationNodePort;
 
 	/* local copy if destination shard in same node */
 	bool useLocalCopy;
@@ -70,7 +71,6 @@ static void ShardCopyDestReceiverStartup(DestReceiver *dest, int operation,
 										 TupleDesc inputTupleDescriptor);
 static void ShardCopyDestReceiverShutdown(DestReceiver *destReceiver);
 static void ShardCopyDestReceiverDestroy(DestReceiver *destReceiver);
-static bool CanUseLocalCopy(uint32_t destinationNodeId);
 static StringInfo ConstructShardCopyStatement(List *destinationShardFullyQualifiedName,
 											  bool
 											  useBinaryFormat);
@@ -80,13 +80,6 @@ static void LocalCopyToShard(ShardCopyDestReceiver *copyDest, CopyOutState
 							 localCopyOutState);
 static void ConnectToRemoteAndStartCopy(ShardCopyDestReceiver *copyDest);
 
-static bool
-CanUseLocalCopy(uint32_t destinationNodeId)
-{
-	/* If destination node is same as source, use local copy */
-	return GetLocalNodeId() == (int32) destinationNodeId;
-}
-
 
 /* Connect to node with source shard and trigger copy start.  */
 static void
@@ -94,11 +87,9 @@ ConnectToRemoteAndStartCopy(ShardCopyDestReceiver *copyDest)
 {
 	int connectionFlags = OUTSIDE_TRANSACTION;
 	char *currentUser = CurrentUserName();
-	WorkerNode *workerNode = FindNodeWithNodeId(copyDest->destinationNodeId,
-												false /* missingOk */);
 	copyDest->connection = GetNodeUserDatabaseConnection(connectionFlags,
-														 workerNode->workerName,
-														 workerNode->workerPort,
+														 copyDest->destinationNodeName,
+														 copyDest->destinationNodePort,
 														 currentUser,
 														 NULL /* database (current) */);
 	ClaimConnectionExclusively(copyDest->connection);
@@ -125,12 +116,14 @@ ConnectToRemoteAndStartCopy(ShardCopyDestReceiver *copyDest)
 
 /*
  * CreateShardCopyDestReceiver creates a DestReceiver that copies into
- * a destinationShardFullyQualifiedName on destinationNodeId.
+ * a destinationShardFullyQualifiedName to a destination node.
  */
 DestReceiver *
 CreateShardCopyDestReceiver(EState *executorState,
 							List *destinationShardFullyQualifiedName,
-							uint32_t destinationNodeId)
+							char *targetNodeName,
+							int targetNodePort,
+							bool isLocal)
 {
 	ShardCopyDestReceiver *copyDest = (ShardCopyDestReceiver *) palloc0(
 		sizeof(ShardCopyDestReceiver));
@@ -143,11 +136,12 @@ CreateShardCopyDestReceiver(EState *executorState,
 	copyDest->pub.mydest = DestCopyOut;
 	copyDest->executorState = executorState;
 
-	copyDest->destinationNodeId = destinationNodeId;
+	copyDest->destinationNodeName = targetNodeName;
+	copyDest->destinationNodePort = targetNodePort;
 	copyDest->destinationShardFullyQualifiedName = destinationShardFullyQualifiedName;
 	copyDest->tuplesSent = 0;
 	copyDest->connection = NULL;
-	copyDest->useLocalCopy = CanUseLocalCopy(destinationNodeId);
+	copyDest->useLocalCopy = isLocal;
 
 	return (DestReceiver *) copyDest;
 }
@@ -218,10 +212,11 @@ ShardCopyDestReceiverReceive(TupleTableSlot *slot, DestReceiver *dest)
 								   destinationShardSchemaName,
 								   destinationShardRelationName,
 								   errorMessage),
-							errdetail("failed to send %d bytes %s on node %u",
+							errdetail("failed to send %d bytes %s to node %s:%d",
 									  copyOutState->fe_msgbuf->len,
 									  copyOutState->fe_msgbuf->data,
-									  copyDest->destinationNodeId)));
+									  copyDest->destinationNodeName,
+									  copyDest->destinationNodePort)));
 		}
 	}
 
@@ -301,10 +296,11 @@ ShardCopyDestReceiverShutdown(DestReceiver *dest)
 							errmsg("Failed to COPY to destination shard %s.%s",
 								   destinationShardSchemaName,
 								   destinationShardRelationName),
-							errdetail("failed to send %d bytes %s on node %u",
+							errdetail("failed to send %d bytes %s on node %s:%d",
 									  copyDest->copyOutState->fe_msgbuf->len,
 									  copyDest->copyOutState->fe_msgbuf->data,
-									  copyDest->destinationNodeId)));
+									  copyDest->destinationNodeName,
+									  copyDest->destinationNodePort)));
 		}
 
 		/* check whether there were any COPY errors */

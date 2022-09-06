@@ -17,6 +17,8 @@ extern bool EnableBinaryProtocol;
 
 extern DestReceiver * CreateShardCopyDestReceiver(EState *executorState,
 												  List *destinationShardFullyQualifiedName,
-												  uint32_t destinationNodeId);
+												  char *targetNodeName,
+												  int targetNodePort,
+												  bool isLocalNode);
 
 #endif /* WORKER_SHARD_COPY_H_ */
