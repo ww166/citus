@@ -241,7 +241,7 @@ GenerateSubplansForSubqueriesAndCTEs(uint64 planId, Query *originalQuery,
 		pg_get_query_def(originalQuery, subPlanString);
 		ereport(DEBUG1, (errmsg(
 							 "Plan " UINT64_FORMAT
-							 " query after replacing subqueries and CTEs: %s", planId,
+							 " query after replacing subqueries and CTEs -: %s", planId,
 							 subPlanString->data)));
 	}
 
