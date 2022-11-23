@@ -188,7 +188,7 @@ CreateShardsWithRoundRobinPolicy(Oid distributedTableId, int32 shardCount,
 		text *maxHashTokenText = IntegerToText(shardMaxHashToken);
 
 		InsertShardRow(distributedTableId, shardId, shardStorageType,
-					   minHashTokenText, maxHashTokenText);
+					   minHashTokenText, maxHashTokenText, NULL);
 
 		List *currentInsertedShardPlacements = InsertShardPlacementRows(
 			distributedTableId,
@@ -254,6 +254,7 @@ CreateColocatedShards(Oid targetRelationId, Oid sourceRelationId, bool
 	foreach_ptr(sourceShardInterval, sourceShardIntervalList)
 	{
 		uint64 sourceShardId = sourceShardInterval->shardId;
+		uint64 sourceShardGroupId = sourceShardInterval->shardGroupId;
 		uint64 newShardId = GetNextShardId();
 
 		int32 shardMinValue = DatumGetInt32(sourceShardInterval->minValue);
@@ -264,7 +265,7 @@ CreateColocatedShards(Oid targetRelationId, Oid sourceRelationId, bool
 			sourceShardId);
 
 		InsertShardRow(targetRelationId, newShardId, targetShardStorageType,
-					   shardMinValueText, shardMaxValueText);
+					   shardMinValueText, shardMaxValueText, &sourceShardGroupId);
 
 		ShardPlacement *sourcePlacement = NULL;
 		foreach_ptr(sourcePlacement, sourceShardPlacementList)
@@ -344,7 +345,7 @@ CreateReferenceTableShard(Oid distributedTableId)
 	uint64 shardId = GetNextShardId();
 
 	InsertShardRow(distributedTableId, shardId, shardStorageType, shardMinValue,
-				   shardMaxValue);
+				   shardMaxValue, NULL);
 
 	List *insertedShardPlacements = InsertShardPlacementRows(distributedTableId, shardId,
 															 nodeList, workerStartIndex,

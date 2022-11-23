@@ -4502,6 +4502,7 @@ GenerateSyntheticShardIntervalArray(int partitionCount)
 		shardInterval->maxValue = Int32GetDatum(shardMaxHashToken);
 
 		shardInterval->shardId = INVALID_SHARD_ID;
+		shardInterval->shardGroupId = INVALID_SHARD_ID;
 		shardInterval->valueTypeId = INT4OID;
 
 		shardIntervalArray[shardIndex] = shardInterval;
