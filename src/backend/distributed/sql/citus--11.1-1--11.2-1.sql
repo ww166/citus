@@ -72,3 +72,5 @@ DROP FUNCTION pg_catalog.citus_internal_add_shard_metadata(
     storage_type "char", shard_min_value text,
     shard_max_value text
 );
+
+#include "udfs/citus_internal_add_shardgroup_metadata/11.2-1.sql"
