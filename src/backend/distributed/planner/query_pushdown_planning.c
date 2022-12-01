@@ -93,8 +93,6 @@ static DeferredErrorMessage * DeferErrorIfSubqueryRequiresMerge(Query *subqueryT
 																lateral,
 																char *referencedThing);
 static bool ExtractSetOperationStatementWalker(Node *node, List **setOperationList);
-static RecurringTuplesType FetchFirstRecurType(PlannerInfo *plannerInfo,
-											   Relids relids);
 static bool ContainsRecurringRTE(RangeTblEntry *rangeTableEntry,
 								 RecurringTuplesType *recurType);
 static bool ContainsRecurringRangeTable(List *rangeTable, RecurringTuplesType *recurType);
@@ -603,7 +601,6 @@ DeferErrorIfUnsupportedSubqueryPushdown(Query *originalQuery,
 		return error;
 	}
 
-	/* we shouldn't allow reference tables in the outer part of outer joins */
 	error = DeferredErrorIfUnsupportedRecurringTuplesJoin(plannerRestrictionContext);
 	if (error)
 	{
@@ -643,7 +640,7 @@ DeferErrorIfUnsupportedSubqueryPushdown(Query *originalQuery,
  * sublinks into joins.
  *
  * In some cases, sublinks are pulled up and converted into outer joins. Those cases
- * are already handled with DeferredErrorIfUnsupportedRecurringTuplesJoin().
+ * are already handled with RecursivelyPlanRecurringTupleOuterJoinWalker().
  *
  * If the sublinks are not pulled up, we should still error out in if the expression
  * in the FROM clause would recur for every shard in a subquery on the WHERE clause.
@@ -751,20 +748,11 @@ FromClauseRecurringTupleType(Query *queryTree)
 
 
 /*
- * DeferredErrorIfUnsupportedRecurringTuplesJoin returns true if there exists a outer join
- * between reference table and distributed tables which does not follow
- * the rules :
- * - Reference tables can not be located in the outer part of the semi join or the
- * anti join. Otherwise, we may have duplicate results. Although getting duplicate
- * results is not possible by checking the equality on the column of the reference
- * table and partition column of distributed table, we still keep these checks.
- * Because, using the reference table in the outer part of the semi join or anti
- * join is not very common.
- * - Reference tables can not be located in the outer part of the left join
- * (Note that PostgreSQL converts right joins to left joins. While converting
- * join types, innerrel and outerrel are also switched.) Otherwise we will
- * definitely have duplicate rows. Beside, reference tables can not be used
- * with full outer joins because of the same reason.
+ * DeferredErrorIfUnsupportedRecurringTuplesJoin returns a DeferredError if
+ * there exists a join between a recurring rel (such as reference tables
+ * and intermediate_results) and a non-recurring rel (such as distributed tables
+ * and subqueries that we can push-down to worker nodes) that can return an
+ * incorrect result set due to recurring tuples coming from the recurring rel.
  */
 static DeferredErrorMessage *
 DeferredErrorIfUnsupportedRecurringTuplesJoin(
@@ -773,90 +761,42 @@ DeferredErrorIfUnsupportedRecurringTuplesJoin(
 	List *joinRestrictionList =
 		plannerRestrictionContext->joinRestrictionContext->joinRestrictionList;
 	ListCell *joinRestrictionCell = NULL;
-	RecurringTuplesType recurType = RECURRING_TUPLES_INVALID;
 	foreach(joinRestrictionCell, joinRestrictionList)
 	{
 		JoinRestriction *joinRestriction = (JoinRestriction *) lfirst(
 			joinRestrictionCell);
 		JoinType joinType = joinRestriction->joinType;
 		PlannerInfo *plannerInfo = joinRestriction->plannerInfo;
-		Relids innerrelRelids = joinRestriction->innerrelRelids;
-		Relids outerrelRelids = joinRestriction->outerrelRelids;
 
-		if (joinType == JOIN_SEMI || joinType == JOIN_ANTI || joinType == JOIN_LEFT)
+		/*
+		 * This loop aims to determine whether this join is between a recurring
+		 * rel and a non-recurring rel, and if so, whether it can yield an incorrect
+		 * result set due to recurring tuples.
+		 *
+		 * For semi / anti joins, we anyway throw an error when the inner
+		 * side is a distributed subquery that references a recurring outer rel
+		 * (in the FROM clause) thanks to DeferErrorIfFromClauseRecurs. And when
+		 * the inner side is a recurring rel and the outer side a non-recurring
+		 * one, then the non-recurring side can't reference the recurring side
+		 * anyway.
+		 *
+		 * For those reasons, here we perform below lateral join checks only for
+		 * outer (except anti) / inner joins but not for anti / semi joins.
+		 */
+
+		if (plannerInfo->hasLateralRTEs &&
+			(joinType == JOIN_LEFT || joinType == JOIN_FULL || joinType == JOIN_INNER))
 		{
-			/*
-			 * If there are only recurring tuples on the inner side of a join then
-			 * we can push it down, regardless of whether the outer side is
-			 * recurring or not. Otherwise, we check the outer side for recurring
-			 * tuples.
-			 */
-			if (RelationInfoContainsOnlyRecurringTuples(plannerInfo, innerrelRelids))
-			{
-				continue;
-			}
-
+			Relids innerrelRelids = joinRestriction->innerrelRelids;
+			Relids outerrelRelids = joinRestriction->outerrelRelids;
 
 			/*
-			 * If the outer side of the join doesn't have any distributed tables
-			 * (e.g., contains only recurring tuples), Citus should not pushdown
-			 * the query. The reason is that recurring tuples on every shard would
-			 * be added to the result, which is wrong.
-			 */
-			if (RelationInfoContainsOnlyRecurringTuples(plannerInfo, outerrelRelids))
-			{
-				/*
-				 * Find the first (or only) recurring RTE to give a meaningful
-				 * error to the user.
-				 */
-				recurType = FetchFirstRecurType(plannerInfo, outerrelRelids);
-
-				break;
-			}
-		}
-		else if (joinType == JOIN_FULL)
-		{
-			/*
-			 * If one of the outer or inner side contains recurring tuples and the other side
-			 * contains nonrecurring tuples, then duplicate results can exist in the result.
-			 * Thus, Citus should not pushdown the query.
-			 */
-			bool innerContainOnlyRecurring =
-				RelationInfoContainsOnlyRecurringTuples(plannerInfo, innerrelRelids);
-			bool outerContainOnlyRecurring =
-				RelationInfoContainsOnlyRecurringTuples(plannerInfo, outerrelRelids);
-
-			if (innerContainOnlyRecurring && !outerContainOnlyRecurring)
-			{
-				/*
-				 * Find the first (or only) recurring RTE to give a meaningful
-				 * error to the user.
-				 */
-				recurType = FetchFirstRecurType(plannerInfo, innerrelRelids);
-
-				break;
-			}
-
-			if (!innerContainOnlyRecurring && outerContainOnlyRecurring)
-			{
-				/*
-				 * Find the first (or only) recurring RTE to give a meaningful
-				 * error to the user.
-				 */
-				recurType = FetchFirstRecurType(plannerInfo, outerrelRelids);
-
-				break;
-			}
-		}
-		else if (joinType == JOIN_INNER && plannerInfo->hasLateralRTEs)
-		{
-			/*
-			 * Sometimes we cannot push down INNER JOINS when they have only
+			 * Sometimes we cannot push down JOINS when they have only
 			 * recurring tuples on one side and a lateral on the other side.
 			 * See comment on DeferredErrorIfUnsupportedLateralSubquery for
 			 * details.
 			 *
-			 * When planning inner joins postgres can move RTEs from left to
+			 * When planning joins, postgres can move RTEs from left to
 			 * right and from right to left. So we don't know on which side the
 			 * lateral join wil appear. Thus we try to find a side of the join
 			 * that only contains recurring tuples. And then we check the other
@@ -891,43 +831,6 @@ DeferredErrorIfUnsupportedRecurringTuplesJoin(
 				}
 			}
 		}
-	}
-
-	if (recurType == RECURRING_TUPLES_REFERENCE_TABLE)
-	{
-		return DeferredError(ERRCODE_FEATURE_NOT_SUPPORTED,
-							 "cannot pushdown the subquery",
-							 "There exist a reference table in the outer "
-							 "part of the outer join", NULL);
-	}
-	else if (recurType == RECURRING_TUPLES_FUNCTION)
-	{
-		return DeferredError(ERRCODE_FEATURE_NOT_SUPPORTED,
-							 "cannot pushdown the subquery",
-							 "There exist a table function in the outer "
-							 "part of the outer join", NULL);
-	}
-	else if (recurType == RECURRING_TUPLES_EMPTY_JOIN_TREE)
-	{
-		return DeferredError(ERRCODE_FEATURE_NOT_SUPPORTED,
-							 "cannot pushdown the subquery",
-							 "There exist a subquery without FROM in the outer "
-							 "part of the outer join", NULL);
-	}
-	else if (recurType == RECURRING_TUPLES_RESULT_FUNCTION)
-	{
-		return DeferredError(ERRCODE_FEATURE_NOT_SUPPORTED,
-							 "cannot pushdown the subquery",
-							 "Complex subqueries, CTEs and local tables cannot be in "
-							 "the outer part of an outer join with a distributed table",
-							 NULL);
-	}
-	else if (recurType == RECURRING_TUPLES_VALUES)
-	{
-		return DeferredError(ERRCODE_FEATURE_NOT_SUPPORTED,
-							 "cannot pushdown the subquery",
-							 "There exist a VALUES clause in the outer "
-							 "part of the outer join", NULL);
 	}
 
 	return NULL;
@@ -1701,36 +1604,6 @@ DeferredErrorIfUnsupportedLateralSubquery(PlannerInfo *plannerInfo,
 	}
 
 	return NULL;
-}
-
-
-/*
- * FetchFirstRecurType checks whether the relationInfo
- * contains any recurring table expression, namely a reference table,
- * or immutable function. If found, FetchFirstRecurType
- * returns true.
- *
- * Note that since relation ids of relationInfo indexes to the range
- * table entry list of planner info, planner info is also passed.
- */
-static RecurringTuplesType
-FetchFirstRecurType(PlannerInfo *plannerInfo, Relids relids)
-{
-	RecurringTuplesType recurType = RECURRING_TUPLES_INVALID;
-	int relationId = -1;
-
-	while ((relationId = bms_next_member(relids, relationId)) >= 0)
-	{
-		RangeTblEntry *rangeTableEntry = plannerInfo->simple_rte_array[relationId];
-
-		/* relationInfo has this range table entry */
-		if (ContainsRecurringRTE(rangeTableEntry, &recurType))
-		{
-			return recurType;
-		}
-	}
-
-	return recurType;
 }
 
 
