@@ -196,7 +196,7 @@ CreateShardsWithRoundRobinPolicy(Oid distributedTableId, int32 shardCount,
 		uint64 shardId = GetNextShardId();
 
 		/* we use shardid of the first shard in a shardgroup as the shardgroupid */
-		uint64 shardGroupId = shardId;
+		int64 shardGroupId = (int64) shardId;
 
 		/* if we are at the last shard, make sure the max token value is INT_MAX */
 		if (shardIndex == (shardCount - 1))
@@ -297,7 +297,7 @@ CreateColocatedShards(Oid targetRelationId, Oid sourceRelationId, bool
 	foreach_ptr(sourceShardInterval, sourceShardIntervalList)
 	{
 		uint64 sourceShardId = sourceShardInterval->shardId;
-		uint64 sourceShardGroupId = sourceShardInterval->shardGroupId;
+		int64 sourceShardGroupId = sourceShardInterval->shardGroupId;
 		uint64 newShardId = GetNextShardId();
 
 		int32 shardMinValue = DatumGetInt32(sourceShardInterval->minValue);
@@ -392,7 +392,7 @@ CreateReferenceTableShard(Oid distributedTableId, Oid colocatedTableId,
 
 		/* get the next shard id */
 		uint64 shardId = GetNextShardId();
-		uint64 shardGroupId = shardId;
+		int64 shardGroupId = (int64) shardId;
 
 		StringInfoData shardgroupQuery = { 0 };
 		initStringInfo(&shardgroupQuery);
