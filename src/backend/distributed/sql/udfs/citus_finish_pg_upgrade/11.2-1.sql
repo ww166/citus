@@ -56,6 +56,7 @@ BEGIN
     --
     INSERT INTO pg_catalog.pg_dist_partition SELECT * FROM public.pg_dist_partition;
     INSERT INTO pg_catalog.pg_dist_shard SELECT * FROM public.pg_dist_shard;
+    INSERT INTO pg_catalog.pg_dist_shardgroup SELECT * FROM public.pg_dist_shardgroup;
     INSERT INTO pg_catalog.pg_dist_placement SELECT * FROM public.pg_dist_placement;
     INSERT INTO pg_catalog.pg_dist_node_metadata SELECT * FROM public.pg_dist_node_metadata;
     INSERT INTO pg_catalog.pg_dist_node SELECT * FROM public.pg_dist_node;
@@ -90,6 +91,7 @@ BEGIN
     DROP TABLE public.pg_dist_placement;
     DROP TABLE public.pg_dist_poolinfo;
     DROP TABLE public.pg_dist_shard;
+    DROP TABLE public.pg_dist_shardgroup;
     DROP TABLE public.pg_dist_transaction;
     DROP TABLE public.pg_dist_rebalance_strategy;
     DROP TABLE public.pg_dist_cleanup;
@@ -97,6 +99,7 @@ BEGIN
     -- reset sequences
     --
     PERFORM setval('pg_catalog.pg_dist_shardid_seq', (SELECT MAX(shardid)+1 AS max_shard_id FROM pg_dist_shard), false);
+    PERFORM setval('pg_catalog.pg_dist_shardgroupid_seq', (SELECT MAX(shardgroupid)+1 AS max_shardgroup_id FROM pg_dist_shardgroup), false);
     PERFORM setval('pg_catalog.pg_dist_placement_placementid_seq', (SELECT MAX(placementid)+1 AS max_placement_id FROM pg_dist_placement), false);
     PERFORM setval('pg_catalog.pg_dist_groupid_seq', (SELECT MAX(groupid)+1 AS max_group_id FROM pg_dist_node), false);
     PERFORM setval('pg_catalog.pg_dist_node_nodeid_seq', (SELECT MAX(nodeid)+1 AS max_node_id FROM pg_dist_node), false);

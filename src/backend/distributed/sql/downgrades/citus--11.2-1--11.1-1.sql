@@ -1,4 +1,6 @@
 -- citus--11.2-1--11.1-1
+#include "../udfs/citus_prepare_pg_upgrade/11.1-1.sql"
+#include "../udfs/citus_finish_pg_upgrade/11.1-1.sql"
 #include "../udfs/get_rebalance_progress/11.1-1.sql"
 #include "../udfs/citus_isolation_test_session_is_blocked/11.1-1.sql"
 DROP FUNCTION pg_catalog.citus_get_node_clock();

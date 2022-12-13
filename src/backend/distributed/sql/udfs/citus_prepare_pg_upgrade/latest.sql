@@ -22,6 +22,7 @@ BEGIN
     --
     DROP TABLE IF EXISTS public.pg_dist_partition;
     DROP TABLE IF EXISTS public.pg_dist_shard;
+    DROP TABLE IF EXISTS public.pg_dist_shardgroup;
     DROP TABLE IF EXISTS public.pg_dist_placement;
     DROP TABLE IF EXISTS public.pg_dist_node_metadata;
     DROP TABLE IF EXISTS public.pg_dist_node;
@@ -40,6 +41,7 @@ BEGIN
     --
     CREATE TABLE public.pg_dist_partition AS SELECT * FROM pg_catalog.pg_dist_partition;
     CREATE TABLE public.pg_dist_shard AS SELECT * FROM pg_catalog.pg_dist_shard;
+    CREATE TABLE public.pg_dist_shardgroup AS SELECT * FROM pg_catalog.pg_dist_shardgroup;
     CREATE TABLE public.pg_dist_placement AS SELECT * FROM pg_catalog.pg_dist_placement;
     CREATE TABLE public.pg_dist_node_metadata AS SELECT * FROM pg_catalog.pg_dist_node_metadata;
     CREATE TABLE public.pg_dist_node AS SELECT * FROM pg_catalog.pg_dist_node;
