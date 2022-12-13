@@ -310,6 +310,7 @@ SET search_path TO single_node_ent;
 -- Cleanup
 RESET citus.log_remote_commands;
 SET client_min_messages TO WARNING;
+CALL pg_catalog.citus_cleanup_orphaned_resources();
 DROP SCHEMA single_node_ent CASCADE;
 
 DROP OWNED BY full_access_single_node;
