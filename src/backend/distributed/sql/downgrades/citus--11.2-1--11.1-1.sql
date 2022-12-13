@@ -25,7 +25,7 @@ COMMENT ON FUNCTION pg_catalog.worker_append_table_to_shard(text, text, text, in
 DROP FUNCTION pg_catalog.citus_task_wait(bigint, pg_catalog.citus_task_status);
 
 DROP TABLE pg_catalog.pg_dist_shardgroup;
-DROP SEQUENCE citus.pg_dist_shardgroupid_seq;
+DROP SEQUENCE pg_catalog.pg_dist_shardgroupid_seq;
 
 ALTER TABLE pg_catalog.pg_dist_shard DROP COLUMN shardgroupid;
 
@@ -33,4 +33,4 @@ DROP FUNCTION pg_catalog.citus_internal_add_shard_metadata(regclass, bigint, "ch
 #include "../udfs/citus_internal_add_shard_metadata/10.2-1.sql"
 
 DROP FUNCTION pg_catalog.citus_internal_add_shardgroup_metadata(bigint, integer, text, text);
-DROP FUNCTION FUNCTION pg_catalog.citus_internal_delete_shardgroup_metadata(bigint, int);
+DROP FUNCTION pg_catalog.citus_internal_delete_shardgroup_metadata(bigint, int);
