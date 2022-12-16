@@ -863,6 +863,7 @@ AlterTableConstraintCheck(QueryDesc *queryDesc)
 
 	if (SkipConstraintValidation)
 	{
+		elog(ERROR, "ATER TABLE CONSTRAINT CHECK");
 		return true;
 	}
 
