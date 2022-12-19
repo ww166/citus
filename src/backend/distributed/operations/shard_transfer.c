@@ -300,15 +300,6 @@ citus_move_shard_placement(PG_FUNCTION_ARGS)
 
 		EnsureShardCanBeCopied(colocatedShardId, sourceNodeName, sourceNodePort,
 							   targetNodeName, targetNodePort);
-
-		/*
-		 * This is to prevent any race condition possibility among the shard moves.
-		 * We don't allow the move to happen if the shard we are going to move has an
-		 * orphaned placement somewhere that is not cleanup up yet.
-		 * If so, here we clean it up and continue; or fail in case we can't clean it up.
-		 */
-		char *qualifiedShardName = ConstructQualifiedShardName(colocatedShard);
-		CleanupIfRecordWithShardNameExists(qualifiedShardName);
 	}
 
 	char shardReplicationMode = LookupShardTransferMode(shardReplicationModeOid);
@@ -385,6 +376,20 @@ citus_move_shard_placement(PG_FUNCTION_ARGS)
 		PlacementMovedUsingLogicalReplicationInTX = true;
 	}
 
+	DropOrphanedResourcesInSeparateTransaction();
+
+	ShardInterval *colocatedShard = NULL;
+	foreach_ptr(colocatedShard, colocatedShardList)
+	{
+		/*
+		 * This is to prevent any race condition possibility among the shard moves.
+		 * We don't allow the move to happen if the shard we are going to move has an
+		 * orphaned placement somewhere that is not cleanup up yet.
+		 */
+		char *qualifiedShardName = ConstructQualifiedShardName(colocatedShard);
+		ErrorIfCleanupRecordForShardExists(qualifiedShardName);
+	}
+
 	/*
 	 * CopyColocatedShardPlacement function copies given shard with its co-located
 	 * shards.
@@ -397,7 +402,7 @@ citus_move_shard_placement(PG_FUNCTION_ARGS)
 	InsertCleanupRecordsForShardPlacementsOnNode(colocatedShardList,
 												 sourceGroupId);
 
-	ShardInterval *colocatedShard = NULL;
+	colocatedShard = NULL;
 	foreach_ptr(colocatedShard, colocatedShardList)
 	{
 		uint64 colocatedShardId = colocatedShard->shardId;
@@ -1140,6 +1145,8 @@ ReplicateColocatedShardPlacement(int64 shardId, char *sourceNodeName,
 		EnsureReferenceTablesExistOnAllNodesExtended(shardReplicationMode);
 	}
 
+	DropOrphanedResourcesInSeparateTransaction();
+
 	CopyShardTables(colocatedShardList, sourceNodeName, sourceNodePort,
 					targetNodeName, targetNodePort, useLogicalReplication);
 
@@ -1238,8 +1245,6 @@ CopyShardTables(List *shardIntervalList, char *sourceNodeName, int32 sourceNodeP
 	{
 		return;
 	}
-
-	DropOrphanedResourcesInSeparateTransaction();
 
 	if (useLogicalReplication)
 	{
