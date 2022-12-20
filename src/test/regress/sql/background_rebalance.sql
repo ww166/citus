@@ -80,3 +80,4 @@ RESET ROLE;
 
 SET client_min_messages TO WARNING;
 DROP SCHEMA background_rebalance CASCADE;
+DROP USER non_super_user_rebalance;
