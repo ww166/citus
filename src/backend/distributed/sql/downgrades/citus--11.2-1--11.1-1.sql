@@ -5,6 +5,8 @@ DROP FUNCTION pg_catalog.citus_get_node_clock();
 DROP FUNCTION pg_catalog.citus_get_transaction_clock();
 DROP FUNCTION pg_catalog.citus_internal_adjust_local_clock_to_remote(cluster_clock);
 DROP FUNCTION pg_catalog.citus_is_clock_after(cluster_clock, cluster_clock);
+DROP FUNCTION pg_catalog.citus_job_list();
+DROP FUNCTION pg_catalog.citus_job_status();
 DROP FUNCTION pg_catalog.cluster_clock_logical(cluster_clock);
 DROP SEQUENCE pg_catalog.pg_dist_clock_logical_seq;
 DROP OPERATOR CLASS pg_catalog.cluster_clock_ops USING btree CASCADE;
