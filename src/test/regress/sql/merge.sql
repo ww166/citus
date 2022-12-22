@@ -997,6 +997,43 @@ WHEN MATCHED THEN
 WHEN NOT MATCHED THEN
     INSERT VALUES(mv_source.id, mv_source.val);
 
+-- Distributed tables *must* be colocated
+CREATE TABLE dist_target(id int, val varchar);
+SELECT create_distributed_table('dist_target', 'id');
+CREATE TABLE dist_source(id int, val varchar);
+SELECT create_distributed_table('dist_source', 'id', colocate_with => 'none');
+
+MERGE INTO dist_target
+USING dist_source
+ON dist_target.id = dist_source.id
+WHEN MATCHED THEN
+UPDATE SET val = dist_source.val
+WHEN NOT MATCHED THEN
+INSERT VALUES(dist_source.id, dist_source.val);
+
+-- Non-hash distributed tables (append/range).
+SELECT undistribute_table('dist_source');
+SELECT create_distributed_table('dist_source', 'id', 'append');
+
+MERGE INTO dist_target
+USING dist_source
+ON dist_target.id = dist_source.id
+WHEN MATCHED THEN
+UPDATE SET val = dist_source.val
+WHEN NOT MATCHED THEN
+INSERT VALUES(dist_source.id, dist_source.val);
+
+SELECT undistribute_table('dist_source');
+SELECT create_distributed_table('dist_source', 'id', 'range');
+
+MERGE INTO dist_target
+USING dist_source
+ON dist_target.id = dist_source.id
+WHEN MATCHED THEN
+UPDATE SET val = dist_source.val
+WHEN NOT MATCHED THEN
+INSERT VALUES(dist_source.id, dist_source.val);
+
 DROP SERVER foreign_server CASCADE;
 DROP SCHEMA merge_schema CASCADE;
 SELECT 1 FROM master_remove_node('localhost', :master_port);
