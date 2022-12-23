@@ -26,7 +26,7 @@ test_file_name = args['test_name']
 use_base_schedule = args['use_base_schedule']
 use_whole_schedule_line = args['use_whole_schedule_line']
 
-test_files_to_skip = ['multi_cluster_management']
+test_files_to_skip = ['multi_cluster_management', 'multi_extension']
 
 if not (test_file_name or test_file_path):
     print(f"FATAL: No test given.")
