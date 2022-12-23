@@ -51,6 +51,7 @@ if test_file_path:
         sys.exit(1)
 
 if test_file_name in test_files_to_skip:
+    print(f"WARNING: Skipping exceptional test: '{test_file_name}'")
     sys.exit(0)
 
 test_schedule = ''
