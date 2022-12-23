@@ -27,6 +27,7 @@ use_base_schedule = args['use_base_schedule']
 use_whole_schedule_line = args['use_whole_schedule_line']
 
 test_files_to_skip = ['multi_cluster_management', 'multi_extension']
+test_files_to_run_without_schedule = ['single_node_enterprise']
 
 if not (test_file_name or test_file_path):
     print(f"FATAL: No test given.")
@@ -101,7 +102,8 @@ else:
 # copy base schedule to a temp file and append test_schedule_line
 # to be able to run tests in parallel (if test_schedule_line is a parallel group.)
 tmp_schedule_path = os.path.join(regress_dir, f"tmp_schedule_{ random.randint(1, 10000)}")
-shutil.copy2(os.path.join(regress_dir, test_schedule), tmp_schedule_path)
+if test_file_name not in test_files_to_run_without_schedule:
+    shutil.copy2(os.path.join(regress_dir, test_schedule), tmp_schedule_path)
 with open(tmp_schedule_path, "a") as myfile:
         for i in range(args['repeat']):
             myfile.write(test_schedule_line)

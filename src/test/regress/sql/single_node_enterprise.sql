@@ -315,8 +315,10 @@ DROP SCHEMA single_node_ent CASCADE;
 
 DROP OWNED BY full_access_single_node;
 DROP OWNED BY read_access_single_node;
+DROP OWNED BY no_access_single_node;
 DROP ROLE full_access_single_node;
 DROP ROLE read_access_single_node;
+DROP ROLE no_access_single_node;
 
 -- remove the nodes for next tests
 SELECT 1 FROM master_remove_node('localhost', :master_port);
